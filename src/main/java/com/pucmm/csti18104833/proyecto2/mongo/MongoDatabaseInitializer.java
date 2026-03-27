@@ -15,6 +15,7 @@ public final class MongoDatabaseInitializer {
 
     public static void initialize(MongoDatabase db) {
         seedRoles(db);
+        ensureUsuariosIndexes(db);
         ensureFormulariosIndexes(db);
     }
 
@@ -28,6 +29,11 @@ public final class MongoDatabaseInitializer {
                 new Document("nombre", "ADMIN").append("descripcion", "Administración"),
                 new Document("nombre", "ENCUESTADOR").append("descripcion", "Levantamiento de encuestas")
         ));
+    }
+
+    private static void ensureUsuariosIndexes(MongoDatabase db) {
+        MongoCollection<Document> usuarios = db.getCollection(MongoCollections.USUARIOS);
+        usuarios.createIndex(Indexes.ascending("username"), new IndexOptions().unique(true));
     }
 
     private static void ensureFormulariosIndexes(MongoDatabase db) {

@@ -8,11 +8,21 @@ public final class AppConfig {
     private final String mongoUri;
     private final String databaseName;
     private final int serverPort;
+    private final String jwtSecret;
+    /** Validez del token en milisegundos. */
+    private final long jwtExpirationMs;
 
-    private AppConfig(String mongoUri, String databaseName, int serverPort) {
+    private AppConfig(
+            String mongoUri,
+            String databaseName,
+            int serverPort,
+            String jwtSecret,
+            long jwtExpirationMs) {
         this.mongoUri = mongoUri;
         this.databaseName = databaseName;
         this.serverPort = serverPort;
+        this.jwtSecret = jwtSecret;
+        this.jwtExpirationMs = jwtExpirationMs;
     }
 
     public static AppConfig fromEnvironment() {
@@ -42,7 +52,30 @@ public final class AppConfig {
         }
         int port = parsePort(portRaw.trim());
 
-        return new AppConfig(uri, dbName, port);
+        String jwtSecret = firstNonBlank(
+                System.getenv("JWT_SECRET"),
+                dot.get("JWT_SECRET"),
+                "dev-only-cambiar-con-JWT_SECRET-min-32-caracteres!!");
+        if (jwtSecret.length() < 32) {
+            throw new IllegalStateException(
+                    "JWT_SECRET debe tener al menos 32 caracteres (256 bits) para HS256.");
+        }
+        long jwtExpirationMs = parseExpirationHours(
+                firstNonBlank(System.getenv("JWT_EXPIRES_HOURS"), dot.get("JWT_EXPIRES_HOURS"), "24"));
+
+        return new AppConfig(uri, dbName, port, jwtSecret, jwtExpirationMs);
+    }
+
+    private static long parseExpirationHours(String raw) {
+        try {
+            double h = Double.parseDouble(raw.trim().replace(',', '.'));
+            if (h <= 0 || h > 24 * 365) {
+                throw new IllegalArgumentException("fuera de rango");
+            }
+            return Math.round(h * 60 * 60 * 1000);
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("JWT_EXPIRES_HOURS inválido: " + raw, e);
+        }
     }
 
     private static String firstNonBlank(String... values) {
@@ -79,5 +112,13 @@ public final class AppConfig {
 
     public int getServerPort() {
         return serverPort;
+    }
+
+    public String getJwtSecret() {
+        return jwtSecret;
+    }
+
+    public long getJwtExpirationMs() {
+        return jwtExpirationMs;
     }
 }

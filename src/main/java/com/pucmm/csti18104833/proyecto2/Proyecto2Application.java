@@ -3,8 +3,10 @@ package com.pucmm.csti18104833.proyecto2;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoDatabase;
+import com.pucmm.csti18104833.proyecto2.auth.AuthRoutes;
 import com.pucmm.csti18104833.proyecto2.config.AppConfig;
 import com.pucmm.csti18104833.proyecto2.mongo.MongoDatabaseInitializer;
+import com.pucmm.csti18104833.proyecto2.security.JwtService;
 import io.javalin.Javalin;
 import org.bson.Document;
 
@@ -27,13 +29,20 @@ public class Proyecto2Application {
 
         Runtime.getRuntime().addShutdownHook(new Thread(mongoClient::close));
 
-        Javalin app = Javalin.create();
-        registerRoutes(app, database);
+        JwtService jwtService = new JwtService(config.getJwtSecret(), config.getJwtExpirationMs());
+
+        Javalin app = Javalin.create(javalinConfig ->
+                javalinConfig.bundledPlugins.enableCors(cors ->
+                        cors.addRule(rule -> rule.anyHost())));
+
+        registerRoutes(app, database, jwtService);
 
         app.start(config.getServerPort());
     }
 
-    private static void registerRoutes(Javalin app, MongoDatabase database) {
+    private static void registerRoutes(Javalin app, MongoDatabase database, JwtService jwtService) {
+        AuthRoutes.register(app, database, jwtService);
+
         app.get("/api/health", ctx -> {
             database.runCommand(new Document("ping", 1));
             ctx.json(Map.of(
