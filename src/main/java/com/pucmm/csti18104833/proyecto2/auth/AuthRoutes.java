@@ -4,6 +4,7 @@ import com.mongodb.client.MongoDatabase;
 import com.pucmm.csti18104833.proyecto2.auth.dto.LoginBody;
 import com.pucmm.csti18104833.proyecto2.auth.dto.RegisterBody;
 import com.pucmm.csti18104833.proyecto2.security.AuthPrincipal;
+import com.pucmm.csti18104833.proyecto2.security.BearerAuth;
 import com.pucmm.csti18104833.proyecto2.security.JwtService;
 import io.javalin.Javalin;
 import io.javalin.http.HttpStatus;
@@ -73,27 +74,13 @@ public final class AuthRoutes {
         });
 
         app.get("/api/auth/me", ctx -> {
-            Optional<AuthPrincipal> opt = obtenerPrincipalBearer(ctx.header("Authorization"), jwtService);
+            Optional<AuthPrincipal> opt = BearerAuth.parsePrincipal(ctx.header("Authorization"), jwtService);
             if (opt.isEmpty()) {
                 ctx.status(HttpStatus.UNAUTHORIZED).json(Map.of("error", "Token inválido o ausente."));
                 return;
             }
             ctx.json(Map.of("usuario", usuarioJson(opt.get())));
         });
-    }
-
-    private static Optional<AuthPrincipal> obtenerPrincipalBearer(
-            String authorization,
-            JwtService jwtService) {
-        if (authorization == null || !authorization.regionMatches(true, 0, "Bearer ", 0, "Bearer ".length())) {
-            return Optional.empty();
-        }
-        String token = authorization.substring("Bearer ".length()).trim();
-        if (token.isEmpty()) {
-            return Optional.empty();
-        }
-        AuthPrincipal p = jwtService.parseValid(token);
-        return Optional.ofNullable(p);
     }
 
     static Map<String, Object> usuarioJson(AuthPrincipal p) {

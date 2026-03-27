@@ -4,6 +4,7 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoDatabase;
 import com.pucmm.csti18104833.proyecto2.auth.AuthRoutes;
+import com.pucmm.csti18104833.proyecto2.formulario.FormularioRoutes;
 import com.pucmm.csti18104833.proyecto2.config.AppConfig;
 import com.pucmm.csti18104833.proyecto2.mongo.MongoDatabaseInitializer;
 import com.pucmm.csti18104833.proyecto2.security.JwtService;
@@ -42,6 +43,7 @@ public class Proyecto2Application {
 
     private static void registerRoutes(Javalin app, MongoDatabase database, JwtService jwtService) {
         AuthRoutes.register(app, database, jwtService);
+        FormularioRoutes.register(app, database, jwtService);
 
         app.get("/api/health", ctx -> {
             database.runCommand(new Document("ping", 1));

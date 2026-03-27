@@ -15,6 +15,7 @@ import java.util.Optional;
 public final class UsuarioService {
 
     public static final String ROL_ENCUESTADOR = "ENCUESTADOR";
+    public static final String ROL_ADMIN = "ADMIN";
 
     private final MongoCollection<Document> usuarios;
     private final MongoCollection<Document> roles;
