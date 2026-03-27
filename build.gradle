@@ -78,6 +78,28 @@ tasks.named('test') {
     useJUnitPlatform()
 }
 
+// Carga variables desde .env al ejecutar: gradlew run (no afecta java -jar)
+tasks.named('run', JavaExec) {
+    def envFile = file('.env')
+    if (envFile.exists()) {
+        envFile.eachLine { String line ->
+            line = line.trim()
+            if (line.isEmpty() || line.startsWith('#')) {
+                return
+            }
+            int eq = line.indexOf('=')
+            if (eq > 0) {
+                String key = line.substring(0, eq).trim()
+                String val = line.substring(eq + 1).trim()
+                if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                    val = val.substring(1, val.length() - 1)
+                }
+                environment key, val
+            }
+        }
+    }
+}
+
 // Fat JAR: empaqueta todas las dependencias en un solo JAR ejecutable
 tasks.register('fatJar', Jar) {
     archiveClassifier = 'all'
