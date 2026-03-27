@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package proyecto2.encuesta;
+
+option java_multiple_files = true;
+option java_package = "com.pucmm.csti18104833.proyecto2.grpc";
+option java_outer_classname = "EncuestaProto";
+
+message PingRequest {}
+
+message PingResponse {
+  string ok = 1;
+}
+
+service EncuestaService {
+  rpc Ping(PingRequest) returns (PingResponse);
+}
