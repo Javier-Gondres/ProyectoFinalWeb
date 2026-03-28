@@ -75,20 +75,21 @@ public final class FormularioService {
         }
     }
 
-    /** Resumen sin imagen para listados. */
-    public List<Document> listarResumenPorUsuario(ObjectId usuarioId) {
-        return listarResumen(Filters.eq("usuarioRegistroId", usuarioId));
-    }
-
-    public List<Document> listarResumenTodos() {
-        return listarResumen(null);
-    }
-
-    private List<Document> listarResumen(Bson filtro) {
+    /**
+     * Listado según rol (ADMIN ve todo; resto solo lo propio).
+     *
+     * @param incluirImagenBase64 si false, excluye el campo imagenBase64 de cada documento.
+     */
+    public List<Document> listarVisiblePor(AuthPrincipal viewer, boolean incluirImagenBase64) {
+        Bson filtro = UsuarioService.ROL_ADMIN.equals(viewer.rol())
+                ? null
+                : Filters.eq("usuarioRegistroId", viewer.id());
         List<Document> out = new ArrayList<>();
-        var projection = new Document("imagenBase64", 0);
         var query = filtro == null ? formularios.find() : formularios.find(filtro);
-        query.projection(projection).sort(Sorts.descending("creadoEn")).into(out);
+        if (!incluirImagenBase64) {
+            query = query.projection(new Document("imagenBase64", 0));
+        }
+        query.sort(Sorts.descending("creadoEn")).into(out);
         return out;
     }
 

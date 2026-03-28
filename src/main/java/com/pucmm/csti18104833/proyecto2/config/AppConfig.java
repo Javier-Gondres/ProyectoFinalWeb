@@ -11,18 +11,21 @@ public final class AppConfig {
     private final String jwtSecret;
     /** Validez del token en milisegundos. */
     private final long jwtExpirationMs;
+    private final int grpcPort;
 
     private AppConfig(
             String mongoUri,
             String databaseName,
-            int serverPort,
+            int serverHttpPort,
             String jwtSecret,
-            long jwtExpirationMs) {
+            long jwtExpirationMs,
+            int grpcPort) {
         this.mongoUri = mongoUri;
         this.databaseName = databaseName;
-        this.serverPort = serverPort;
+        this.serverPort = serverHttpPort;
         this.jwtSecret = jwtSecret;
         this.jwtExpirationMs = jwtExpirationMs;
+        this.grpcPort = grpcPort;
     }
 
     public static AppConfig fromEnvironment() {
@@ -63,7 +66,13 @@ public final class AppConfig {
         long jwtExpirationMs = parseExpirationHours(
                 firstNonBlank(System.getenv("JWT_EXPIRES_HOURS"), dot.get("JWT_EXPIRES_HOURS"), "24"));
 
-        return new AppConfig(uri, dbName, port, jwtSecret, jwtExpirationMs);
+        String grpcPortRaw = firstNonBlank(System.getenv("GRPC_PORT"), dot.get("GRPC_PORT"));
+        if (grpcPortRaw == null || grpcPortRaw.isBlank()) {
+            grpcPortRaw = "7070";
+        }
+        int grpcPort = parsePort(grpcPortRaw.trim());
+
+        return new AppConfig(uri, dbName, port, jwtSecret, jwtExpirationMs, grpcPort);
     }
 
     private static long parseExpirationHours(String raw) {
@@ -120,5 +129,9 @@ public final class AppConfig {
 
     public long getJwtExpirationMs() {
         return jwtExpirationMs;
+    }
+
+    public int getGrpcPort() {
+        return grpcPort;
     }
 }

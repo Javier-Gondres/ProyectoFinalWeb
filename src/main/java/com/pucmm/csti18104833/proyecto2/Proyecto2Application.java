@@ -6,11 +6,14 @@ import com.mongodb.client.MongoDatabase;
 import com.pucmm.csti18104833.proyecto2.auth.AuthRoutes;
 import com.pucmm.csti18104833.proyecto2.formulario.FormularioRoutes;
 import com.pucmm.csti18104833.proyecto2.config.AppConfig;
+import com.pucmm.csti18104833.proyecto2.grpc.EncuestaGrpcServer;
 import com.pucmm.csti18104833.proyecto2.mongo.MongoDatabaseInitializer;
 import com.pucmm.csti18104833.proyecto2.security.JwtService;
+import io.grpc.Server;
 import io.javalin.Javalin;
 import org.bson.Document;
 
+import java.io.IOException;
 import java.util.Map;
 
 public class Proyecto2Application {
@@ -28,9 +31,20 @@ public class Proyecto2Application {
             throw e;
         }
 
-        Runtime.getRuntime().addShutdownHook(new Thread(mongoClient::close));
-
         JwtService jwtService = new JwtService(config.getJwtSecret(), config.getJwtExpirationMs());
+
+        Server grpcServer;
+        try {
+            grpcServer = EncuestaGrpcServer.start(config.getGrpcPort(), database, jwtService);
+        } catch (IOException e) {
+            mongoClient.close();
+            throw new IllegalStateException("No se pudo iniciar gRPC en puerto " + config.getGrpcPort(), e);
+        }
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            EncuestaGrpcServer.shutdownGracefully(grpcServer);
+            mongoClient.close();
+        }));
 
         Javalin app = Javalin.create(javalinConfig ->
                 javalinConfig.bundledPlugins.enableCors(cors ->
@@ -54,6 +68,7 @@ public class Proyecto2Application {
             ));
         });
 
-        app.get("/", ctx -> ctx.result("Encuesta PUCMM — API en /api/health"));
+        app.get("/", ctx -> ctx.result(
+                "Encuesta PUCMM — REST /api/* y gRPC (puerto según GRPC_PORT en .env, por defecto 7070)"));
     }
 }

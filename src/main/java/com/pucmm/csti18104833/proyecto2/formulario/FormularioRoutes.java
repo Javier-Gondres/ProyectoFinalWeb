@@ -1,6 +1,5 @@
 package com.pucmm.csti18104833.proyecto2.formulario;
 
-import com.pucmm.csti18104833.proyecto2.auth.UsuarioService;
 import com.pucmm.csti18104833.proyecto2.domain.NivelEscolar;
 import com.pucmm.csti18104833.proyecto2.formulario.dto.CrearFormularioBody;
 import com.pucmm.csti18104833.proyecto2.security.AuthPrincipal;
@@ -32,12 +31,7 @@ public final class FormularioRoutes {
                 return;
             }
             AuthPrincipal p = authOpt.get();
-            List<Document> docs;
-            if (UsuarioService.ROL_ADMIN.equals(p.rol())) {
-                docs = service.listarResumenTodos();
-            } else {
-                docs = service.listarResumenPorUsuario(p.id());
-            }
+            List<Document> docs = service.listarVisiblePor(p, false);
             ctx.json(Map.of("formularios", docs.stream().map(FormularioRoutes::docToJson).collect(Collectors.toList())));
         });
 
