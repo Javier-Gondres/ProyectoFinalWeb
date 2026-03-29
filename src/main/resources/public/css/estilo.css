@@ -689,13 +689,52 @@ button:disabled {
   white-space: nowrap;
 }
 
+.queue-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
 .queue-item .secondary {
   flex: 0 0 auto;
   width: auto;
-  min-width: 5rem;
+  min-width: 4.5rem;
   margin-top: 0;
   padding: 0.45rem 0.75rem;
   font-size: 0.8rem;
+}
+
+.queue-item--editando {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.06);
+}
+
+.banner-edicion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.08);
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+/* display:flex del bloque no debe anular el atributo hidden del navegador */
+.banner-edicion[hidden] {
+  display: none !important;
+}
+
+.banner-edicion .secondary {
+  width: auto;
+  min-width: 8rem;
+  margin-top: 0;
+  flex-shrink: 0;
 }
 
 /* ——— Mapa ——— */

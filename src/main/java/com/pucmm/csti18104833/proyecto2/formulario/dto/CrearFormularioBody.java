@@ -7,6 +7,6 @@ public record CrearFormularioBody(
         String nombre,
         String sector,
         String nivelEscolar,
-        double latitud,
-        double longitud,
+        Double latitud,
+        Double longitud,
         String imagenBase64) {}

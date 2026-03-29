@@ -81,14 +81,22 @@ public final class FormularioRoutes {
                         "nivelEscolar inválido. Use: BASICO, MEDIO, GRADO_UNIVERSITARIO, POSTGRADO, DOCTORADO."));
                 return;
             }
+            Double lat = body.latitud();
+            Double lon = body.longitud();
+            if (lat == null || lon == null || !Double.isFinite(lat) || !Double.isFinite(lon)) {
+                ctx.status(HttpStatus.BAD_REQUEST).json(Map.of(
+                        "error",
+                        "latitud y longitud deben ser números válidos (no pueden quedar vacíos o ser infinitos)."));
+                return;
+            }
             try {
                 Document guardado = service.crear(
                         authOpt.get(),
                         body.nombre(),
                         body.sector(),
                         nivelOpt.get(),
-                        body.latitud(),
-                        body.longitud(),
+                        lat,
+                        lon,
                         body.imagenBase64());
                 ctx.status(HttpStatus.CREATED).json(Map.of("formulario", docToJson(guardado)));
             } catch (IllegalArgumentException e) {

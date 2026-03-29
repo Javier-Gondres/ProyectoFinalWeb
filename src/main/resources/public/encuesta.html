@@ -32,6 +32,10 @@
   <main class="main-wide">
     <h1 class="page-title">Nueva encuesta</h1>
     <p class="page-lead">Datos del encuestado, ubicación y foto. Envío inmediato o guardado en cola local.</p>
+    <div id="bannerEdicion" class="banner-edicion" hidden>
+      <span id="bannerEdicionTexto"></span>
+      <button type="button" class="secondary" id="btnCancelarEdicion" hidden>Cancelar edición</button>
+    </div>
 
     <div class="card">
       <p class="card-title">Formulario</p>
@@ -94,7 +98,7 @@
 
         <div class="form-actions">
           <button type="submit">Enviar al servidor</button>
-          <button type="button" class="secondary" id="btnLocal">Guardar solo en cola local</button>
+          <button type="button" class="secondary" id="btnLocal">Guardar en cola local</button>
         </div>
       </form>
       <div id="msg"></div>
@@ -102,7 +106,7 @@
 
     <div class="card">
       <p class="card-title">Cola local</p>
-      <p class="page-lead" style="margin-bottom:1rem;font-size:0.9rem">Borradores en este dispositivo. Sincronizar cuando haya conexión.</p>
+      <p class="page-lead" style="margin-bottom:1rem;font-size:0.9rem">Borradores en este dispositivo. Puede editarlos antes de sincronizar. Sincronizar cuando haya conexión.</p>
       <ul id="pendientes" class="queue-list"></ul>
       <button type="button" id="btnSyncWs">Sincronizar cola</button>
     </div>

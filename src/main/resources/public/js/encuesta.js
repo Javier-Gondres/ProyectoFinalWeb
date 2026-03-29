@@ -14,6 +14,8 @@ if (!tokenActual()) {
 function initEncuesta() {
   const DB = "encuesta_offline_v1";
   const STORE = "pendientes";
+  /** Si no es null, el formulario actualiza este borrador en cola al guardar local. */
+  let editingLocalId = null;
 
   function openDb() {
     return new Promise((res, rej) => {
@@ -54,6 +56,35 @@ function initEncuesta() {
     });
   }
 
+  async function actualizarPendiente(localId, payload) {
+    const db = await openDb();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(STORE, "readwrite");
+      const store = tx.objectStore(STORE);
+      const r = store.get(localId);
+      r.onsuccess = () => {
+        const prev = r.result;
+        if (!prev) {
+          rej(new Error("Borrador no encontrado."));
+          return;
+        }
+        store.put({
+          localId,
+          creadoLocal: prev.creadoLocal,
+          nombre: payload.nombre,
+          sector: payload.sector,
+          nivelEscolar: payload.nivelEscolar,
+          latitud: payload.latitud,
+          longitud: payload.longitud,
+          imagenBase64: payload.imagenBase64,
+        });
+      };
+      r.onerror = () => rej(r.error);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    });
+  }
+
   function leerFormulario() {
     const nombre = document.querySelector('[name="nombre"]').value.trim();
     const sector = document.querySelector('[name="sector"]').value.trim();
@@ -66,7 +97,8 @@ function initEncuesta() {
 
   function validar(p) {
     if (!p.nombre || !p.sector || !p.nivelEscolar) return "Complete nombre, sector y nivel.";
-    if (Number.isNaN(p.latitud) || Number.isNaN(p.longitud)) return "Coordenadas inválidas.";
+    // JSON.stringify convierte NaN/Infinity en null; el servidor no puede mapear null a double.
+    if (!Number.isFinite(p.latitud) || !Number.isFinite(p.longitud)) return "Coordenadas inválidas.";
     if (!p.imagenBase64) return "Tome o elija una foto.";
     return null;
   }
@@ -143,6 +175,65 @@ function initEncuesta() {
     limpiarFoto();
     flash("Elija un archivo o use la cámara de nuevo.", true);
   });
+
+  function setBannerEdicion() {
+    const b = document.getElementById("bannerEdicion");
+    const t = document.getElementById("bannerEdicionTexto");
+    const btn = document.getElementById("btnCancelarEdicion");
+    if (!b || !t) return;
+    if (editingLocalId == null) {
+      t.textContent = "";
+      b.hidden = true;
+      if (btn) btn.hidden = true;
+      return;
+    }
+    b.hidden = false;
+    if (btn) btn.hidden = false;
+    t.textContent =
+      "Editando borrador #" +
+      editingLocalId;
+  }
+
+  function setTextoBtnLocal() {
+    const btn = document.getElementById("btnLocal");
+    if (!btn) return;
+    btn.textContent = editingLocalId != null ? "Actualizar borrador en cola" : "Guardar en cola local";
+  }
+
+  function cancelarEdicionBorrador() {
+    editingLocalId = null;
+    document.getElementById("formEncuesta").reset();
+    document.getElementById("lat").value = "";
+    document.getElementById("lon").value = "";
+    limpiarFoto();
+    setBannerEdicion();
+    setTextoBtnLocal();
+    renderPendientes();
+    flash("Edición cancelada.", true);
+  }
+
+  document.getElementById("btnCancelarEdicion").addEventListener("click", () => {
+    cancelarEdicionBorrador();
+  });
+
+  function cargarBorradorEnFormulario(it) {
+    document.querySelector('[name="nombre"]').value = it.nombre || "";
+    document.querySelector('[name="sector"]').value = it.sector || "";
+    document.querySelector('[name="nivelEscolar"]').value = it.nivelEscolar || "";
+    document.getElementById("lat").value = it.latitud != null ? String(it.latitud) : "";
+    document.getElementById("lon").value = it.longitud != null ? String(it.longitud) : "";
+    const b64 = (it.imagenBase64 || "").replace(/\s/g, "");
+    document.getElementById("imagenBase64").value = b64;
+    fotoPreviewUrl = b64 ? "data:image/jpeg;base64," + b64 : null;
+    fotoOrigenTexto = "Borrador local";
+    actualizarUIFoto();
+    editingLocalId = it.localId;
+    setBannerEdicion();
+    setTextoBtnLocal();
+    renderPendientes();
+    flash("Borrador cargado", true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   const btnGeo = document.getElementById("btnGeo");
   const textoBtnGeo = btnGeo ? btnGeo.textContent : "Obtener ubicación actual";
@@ -274,13 +365,37 @@ function initEncuesta() {
     const p = leerFormulario();
     const err = validar(p);
     if (err) return flash(err, false);
+    const form = e.target;
+    const btnEnviar = form.querySelector('button[type="submit"]');
+    const btnLocal = document.getElementById("btnLocal");
+    const textoEnviar = btnEnviar ? btnEnviar.textContent : "";
+    if (btnEnviar) {
+      btnEnviar.disabled = true;
+      btnEnviar.textContent = "Cargando...";
+    }
+    if (btnLocal) btnLocal.disabled = true;
+    form.setAttribute("aria-busy", "true");
     try {
       await apiJson("/api/formularios", { method: "POST", body: p });
+      if (editingLocalId != null) {
+        await borrarPendiente(editingLocalId);
+      }
+      editingLocalId = null;
+      setBannerEdicion();
+      setTextoBtnLocal();
       flash("Enviado al servidor correctamente.", true);
-      e.target.reset();
+      form.reset();
       limpiarFoto();
+      renderPendientes();
     } catch (ex) {
       flash(ex.message || "Error al enviar", false);
+    } finally {
+      if (btnEnviar) {
+        btnEnviar.disabled = false;
+        btnEnviar.textContent = textoEnviar;
+      }
+      if (btnLocal) btnLocal.disabled = false;
+      form.removeAttribute("aria-busy");
     }
   });
 
@@ -288,11 +403,23 @@ function initEncuesta() {
     const p = leerFormulario();
     const err = validar(p);
     if (err) return flash(err, false);
-    await guardarPendiente(p);
-    flash("Guardado en cola local (IndexedDB).", true);
-    document.getElementById("formEncuesta").reset();
-    limpiarFoto();
-    renderPendientes();
+    try {
+      if (editingLocalId != null) {
+        await actualizarPendiente(editingLocalId, p);
+        flash("Borrador actualizado en la cola local.", true);
+      } else {
+        await guardarPendiente(p);
+        flash("Guardado en cola local.", true);
+      }
+      editingLocalId = null;
+      setBannerEdicion();
+      setTextoBtnLocal();
+      document.getElementById("formEncuesta").reset();
+      limpiarFoto();
+      renderPendientes();
+    } catch (ex) {
+      flash(ex.message || "No se pudo guardar en cola.", false);
+    }
   });
 
   async function renderPendientes() {
@@ -305,19 +432,38 @@ function initEncuesta() {
     }
     for (const it of items) {
       const li = document.createElement("li");
-      li.className = "queue-item";
+      li.className = "queue-item" + (editingLocalId === it.localId ? " queue-item--editando" : "");
       const meta = document.createElement("span");
       meta.textContent = it.nombre + " · " + it.sector;
+      const actions = document.createElement("div");
+      actions.className = "queue-item__actions";
+      const ed = document.createElement("button");
+      ed.type = "button";
+      ed.textContent = "Editar";
+      ed.className = "secondary";
+      ed.onclick = () => cargarBorradorEnFormulario(it);
       const del = document.createElement("button");
       del.type = "button";
       del.textContent = "Quitar";
       del.className = "secondary";
       del.onclick = async () => {
+        if (editingLocalId === it.localId) {
+          editingLocalId = null;
+          document.getElementById("formEncuesta").reset();
+          document.getElementById("lat").value = "";
+          document.getElementById("lon").value = "";
+          limpiarFoto();
+          setBannerEdicion();
+          setTextoBtnLocal();
+        }
         await borrarPendiente(it.localId);
         renderPendientes();
+        flash("Borrador quitado de la cola.", true);
       };
+      actions.appendChild(ed);
+      actions.appendChild(del);
       li.appendChild(meta);
-      li.appendChild(del);
+      li.appendChild(actions);
       ul.appendChild(li);
     }
   }
@@ -346,7 +492,15 @@ function initEncuesta() {
         }
         if (r.errores?.length) flash("Algunos ítems fallaron: " + JSON.stringify(r.errores), false);
         else flash("Cola sincronizada por WebSocket.", true);
-        renderPendientes();
+        await renderPendientes();
+        if (editingLocalId != null) {
+          const siguen = await listarPendientes();
+          if (!siguen.some((x) => x.localId === editingLocalId)) {
+            editingLocalId = null;
+            setBannerEdicion();
+            setTextoBtnLocal();
+          }
+        }
       };
       worker.postMessage({
         wsUrl: wsSyncUrl(),
@@ -357,6 +511,8 @@ function initEncuesta() {
   });
 
   setCapturaVisible(false);
+  setTextoBtnLocal();
+  setBannerEdicion();
   renderPendientes();
   actualizarUIFoto();
 }

@@ -49,6 +49,7 @@ public class Proyecto2Application {
         }));
 
         Javalin app = Javalin.create(javalinConfig -> {
+            javalinConfig.http.maxRequestSize = 16L * 1024 * 1024; //16 mb
             javalinConfig.bundledPlugins.enableCors(cors -> cors.addRule(rule -> rule.anyHost()));
             javalinConfig.staticFiles.add(staticFiles -> {
                 staticFiles.hostedPath = "/";
