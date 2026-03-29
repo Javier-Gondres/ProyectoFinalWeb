@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d1219" />
+  <title>Encuesta OP — PUCMM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/estilo.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a href="/" class="brand" aria-label="Inicio">
+      <span class="brand-mark">OP</span>
+      <span class="brand-text">Encuesta<span class="brand-sub">Zona norte · PUCMM</span></span>
+    </a>
+    <div class="header-tools">
+      <div id="sessionSlot" class="session-slot" hidden>
+        <span class="session-slot__user" id="sessionUserName"></span>
+        <span class="session-slot__rol" id="sessionUserRol"></span>
+      </div>
+      <nav class="nav-links" aria-label="Principal">
+        <a class="nav-link nav-link--active" href="/">Inicio</a>
+        <a class="nav-link" href="/encuesta.html">Encuesta</a>
+        <a class="nav-link" href="/mapa.html">Mapa</a>
+        <a class="nav-link nav-link--cta" href="/login.html" id="navLogin">Entrar</a>
+      </nav>
+    </div>
+  </header>
+  <main class="main-hero">
+    <section class="hero card">
+      <p class="pill pill--muted">Programación web · ICC-352</p>
+      <h1>Levantamiento de datos en campo</h1>
+      <p class="hero-lead">
+        Captura encuestas con geolocalización, fotografía en base64, cola offline en el navegador y sincronización por WebSocket cuando vuelva la conexión.
+      </p>
+      <div class="cta-row">
+        <a class="nav-link nav-link--cta" href="/encuesta.html" style="padding:0.55rem 1.1rem">Nueva encuesta</a>
+        <a class="nav-link" href="/mapa.html" style="padding:0.55rem 1.1rem;border:1px solid var(--border-strong)">Ver mapa</a>
+      </div>
+    </section>
+    <div class="feature-grid">
+      <article class="feature">
+        <h3>Ubicación</h3>
+        <p>Coordenadas desde el GPS del dispositivo, lista para validación en servidor.</p>
+      </article>
+      <article class="feature">
+        <h3>Foto</h3>
+        <p>Foto desde la cámara del equipo o archivo; envío en base64 al servidor.</p>
+      </article>
+      <article class="feature">
+        <h3>Offline y sync</h3>
+        <p>IndexedDB y worker con WebSocket para reenviar borradores acumulados.</p>
+      </article>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <strong>PUCMM</strong> · Proyecto
+  </footer>
+  <script type="module">
+    import { initSessionHeader } from "/js/nav-session.js";
+    initSessionHeader();
+  </script>
+</body>
+</html>

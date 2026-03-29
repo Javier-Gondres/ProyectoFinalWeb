@@ -9,8 +9,10 @@ import com.pucmm.csti18104833.proyecto2.config.AppConfig;
 import com.pucmm.csti18104833.proyecto2.grpc.EncuestaGrpcServer;
 import com.pucmm.csti18104833.proyecto2.mongo.MongoDatabaseInitializer;
 import com.pucmm.csti18104833.proyecto2.security.JwtService;
+import com.pucmm.csti18104833.proyecto2.websocket.FormularioSyncWebSocket;
 import io.grpc.Server;
 import io.javalin.Javalin;
+import io.javalin.http.staticfiles.Location;
 import org.bson.Document;
 
 import java.io.IOException;
@@ -46,9 +48,14 @@ public class Proyecto2Application {
             mongoClient.close();
         }));
 
-        Javalin app = Javalin.create(javalinConfig ->
-                javalinConfig.bundledPlugins.enableCors(cors ->
-                        cors.addRule(rule -> rule.anyHost())));
+        Javalin app = Javalin.create(javalinConfig -> {
+            javalinConfig.bundledPlugins.enableCors(cors -> cors.addRule(rule -> rule.anyHost()));
+            javalinConfig.staticFiles.add(staticFiles -> {
+                staticFiles.hostedPath = "/";
+                staticFiles.directory = "/public";
+                staticFiles.location = Location.CLASSPATH;
+            });
+        });
 
         registerRoutes(app, database, jwtService);
 
@@ -58,6 +65,9 @@ public class Proyecto2Application {
     private static void registerRoutes(Javalin app, MongoDatabase database, JwtService jwtService) {
         AuthRoutes.register(app, database, jwtService);
         FormularioRoutes.register(app, database, jwtService);
+        FormularioSyncWebSocket.register(app, database, jwtService);
+
+        app.get("/", ctx -> ctx.redirect("/index.html"));
 
         app.get("/api/health", ctx -> {
             database.runCommand(new Document("ping", 1));
@@ -68,7 +78,5 @@ public class Proyecto2Application {
             ));
         });
 
-        app.get("/", ctx -> ctx.result(
-                "Encuesta PUCMM — REST /api/* y gRPC (puerto según GRPC_PORT en .env, por defecto 7070)"));
     }
 }

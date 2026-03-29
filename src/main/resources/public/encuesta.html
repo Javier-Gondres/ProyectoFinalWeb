@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d1219" />
+  <title>Nueva encuesta — Encuesta OP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/estilo.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a href="/" class="brand">
+      <span class="brand-mark">OP</span>
+      <span class="brand-text">Encuesta<span class="brand-sub">Nuevo formulario</span></span>
+    </a>
+    <div class="header-tools">
+      <div id="sessionSlot" class="session-slot" hidden>
+        <span class="session-slot__user" id="sessionUserName"></span>
+        <span class="session-slot__rol" id="sessionUserRol"></span>
+      </div>
+      <nav class="nav-links" aria-label="Principal">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-link nav-link--active" href="/encuesta.html">Encuesta</a>
+        <a class="nav-link" href="/mapa.html">Mapa</a>
+        <a class="nav-link nav-link--cta" href="/login.html" id="navLogin">Entrar</a>
+      </nav>
+    </div>
+  </header>
+  <main class="main-wide">
+    <h1 class="page-title">Nueva encuesta</h1>
+    <p class="page-lead">Datos del encuestado, ubicación y foto. Envío inmediato o guardado en cola local.</p>
+
+    <div class="card">
+      <p class="card-title">Formulario</p>
+      <form id="formEncuesta">
+        <div class="form-section">
+          <h2 class="form-section-title">Datos del encuestado</h2>
+          <label>Nombre completo<input name="nombre" required maxlength="200" autocomplete="name" placeholder="Nombre y apellido" /></label>
+          <label>Sector o comunidad<input name="sector" required maxlength="200" placeholder="Barrio, distrito, etc." /></label>
+          <label>Nivel escolar
+            <select name="nivelEscolar" required>
+              <option value="">Seleccione una opción</option>
+              <option value="BASICO">Básico</option>
+              <option value="MEDIO">Medio</option>
+              <option value="GRADO_UNIVERSITARIO">Grado universitario</option>
+              <option value="POSTGRADO">Postgrado</option>
+              <option value="DOCTORADO">Doctorado</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-section">
+          <h2 class="form-section-title">Ubicación</h2>
+          <div class="form-grid-2">
+            <label>Latitud<input name="latitud" id="lat" type="number" step="any" required placeholder="18.xxx" /></label>
+            <label>Longitud<input name="longitud" id="lon" type="number" step="any" required placeholder="-70.xxx" /></label>
+          </div>
+          <p class="field-hint">Permiso del navegador necesario para usar el GPS.</p>
+          <div class="btn-row btn-row--start">
+            <button type="button" class="secondary" id="btnGeo">Obtener ubicación actual</button>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h2 class="form-section-title">Fotografía</h2>
+          <div id="fotoInputBlock">
+            <label>Archivo o foto desde el teléfono
+              <input type="file" id="fotoFile" accept="image/*" capture="environment" />
+            </label>
+          </div>
+          <div id="fotoResumen" class="foto-resumen" hidden>
+            <div class="foto-resumen__columna">
+              <p class="foto-resumen__titulo-prev">Vista previa de la fotografía</p>
+              <div class="foto-resumen__preview-wrap">
+                <img id="fotoPreview" class="foto-resumen__img" alt="" width="140" height="140" decoding="async" />
+              </div>
+              <p id="fotoEstadoTexto" class="foto-resumen__estado"></p>
+              <button type="button" class="secondary" id="btnCambiarFoto">Cambiar foto</button>
+            </div>
+          </div>
+          <div class="webcam-wrap" id="webcamContainer" hidden>
+            <video id="webcam" playsinline autoplay muted width="640" height="360"></video>
+          </div>
+          <canvas id="fotoCanvas" hidden></canvas>
+          <div class="btn-row">
+            <button type="button" class="secondary" id="btnCam">Iniciar webcam</button>
+            <button type="button" class="secondary" id="btnFoto" hidden>Capturar foto</button>
+          </div>
+          <input type="hidden" name="imagenBase64" id="imagenBase64" />
+        </div>
+
+        <div class="form-actions">
+          <button type="submit">Enviar al servidor</button>
+          <button type="button" class="secondary" id="btnLocal">Guardar solo en cola local</button>
+        </div>
+      </form>
+      <div id="msg"></div>
+    </div>
+
+    <div class="card">
+      <p class="card-title">Cola local</p>
+      <p class="page-lead" style="margin-bottom:1rem;font-size:0.9rem">Borradores en este dispositivo. Sincronizar cuando haya conexión.</p>
+      <ul id="pendientes" class="queue-list"></ul>
+      <button type="button" id="btnSyncWs">Sincronizar cola</button>
+    </div>
+  </main>
+  <footer class="site-footer">Encuesta OP · Borradores offline</footer>
+  <script src="/js/vendor/webcam-easy.min.js"></script>
+  <script type="module" src="/js/encuesta.js"></script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d1219" />
+  <title>Iniciar sesión — Encuesta OP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/estilo.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a href="/" class="brand">
+      <span class="brand-mark">OP</span>
+      <span class="brand-text">Encuesta<span class="brand-sub">Acceso</span></span>
+    </a>
+    <div class="header-tools">
+      <div id="sessionSlot" class="session-slot" hidden>
+        <span class="session-slot__user" id="sessionUserName"></span>
+        <span class="session-slot__rol" id="sessionUserRol"></span>
+      </div>
+      <nav class="nav-links" aria-label="Principal">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-link nav-link--active" href="/login.html" id="navLogin">Entrar</a>
+        <a class="nav-link nav-link--cta" href="/registro.html">Registro</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <h1 class="page-title">Iniciar sesión</h1>
+    <p class="page-lead">Use las credenciales de su encuestador para enviar formularios y ver el mapa.</p>
+    <div class="card auth-card">
+      <p class="card-title">Credenciales</p>
+      <form id="f">
+        <label>Usuario<input name="username" required autocomplete="username" /></label>
+        <label>Contraseña<input name="password" type="password" required autocomplete="current-password" /></label>
+        <button type="submit">Entrar</button>
+      </form>
+      <div id="msg"></div>
+      <p class="auth-footer">¿Sin cuenta? <a href="/registro.html">Crear una</a> · <a href="/">Volver al inicio</a></p>
+    </div>
+  </main>
+  <footer class="site-footer">Encuesta OP · Autenticación JWT</footer>
+  <script type="module">
+    import { guardarToken } from "/js/auth.js";
+    import { apiJson } from "/js/api.js";
+
+    document.getElementById("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById("msg");
+      msg.innerHTML = "";
+      const fd = new FormData(e.target);
+      try {
+        const data = await apiJson("/api/auth/login", {
+          method: "POST",
+          body: {
+            username: fd.get("username"),
+            password: fd.get("password"),
+          },
+        });
+        guardarToken(data.token);
+        msg.innerHTML = '<div class="msg ok">Sesión iniciada. Redirigiendo…</div>';
+        setTimeout(() => (location.href = "/encuesta.html"), 600);
+      } catch (err) {
+        msg.innerHTML = '<div class="msg err">' + (err.message || "Error") + "</div>";
+      }
+    });
+  </script>
+  <script type="module">
+    import { initSessionHeader } from "/js/nav-session.js";
+    initSessionHeader();
+  </script>
+</body>
+</html>

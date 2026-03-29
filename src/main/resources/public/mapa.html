@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d1219" />
+  <title>Mapa — Encuesta OP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="/css/estilo.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a href="/" class="brand">
+      <span class="brand-mark">OP</span>
+      <span class="brand-text">Encuesta<span class="brand-sub">Mapa</span></span>
+    </a>
+    <div class="header-tools">
+      <div id="sessionSlot" class="session-slot" hidden>
+        <span class="session-slot__user" id="sessionUserName"></span>
+        <span class="session-slot__rol" id="sessionUserRol"></span>
+      </div>
+      <nav class="nav-links" aria-label="Principal">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-link" href="/encuesta.html">Encuesta</a>
+        <a class="nav-link nav-link--active" href="/mapa.html">Mapa</a>
+        <a class="nav-link nav-link--cta" href="/login.html" id="navLogin">Entrar</a>
+      </nav>
+    </div>
+  </header>
+  <main class="mapa-main">
+    <h1 class="page-title">Mapa de encuestas</h1>
+    <p class="page-lead">Marcadores según los formularios que su usuario puede ver (JWT). Fuente de mapas: OpenStreetMap.</p>
+    <div class="card card--flush map-shell">
+      <div id="map" role="application" aria-label="Mapa interactivo"></div>
+    </div>
+    <div id="msg"></div>
+  </main>
+  <footer class="site-footer">Encuesta OP · Leaflet</footer>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script type="module" src="/js/mapa.js"></script>
+</body>
+</html>
