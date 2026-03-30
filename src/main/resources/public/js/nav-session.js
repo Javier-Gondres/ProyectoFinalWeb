@@ -56,11 +56,21 @@ function ocultarSlot(slot, nameEl, rolEl) {
 export async function initSessionHeader() {
   const token = tokenActual();
   const navLogin = document.getElementById("navLogin");
+  const navAdmin = document.getElementById("navAdmin");
   const slot = document.getElementById("sessionSlot");
   const nameEl = document.getElementById("sessionUserName");
   const rolEl = document.getElementById("sessionUserRol");
 
   if (!slot || !nameEl || !rolEl) return;
+
+  /** Solo visible con sesión válida y rol ADMIN (la API sigue validando). */
+  const setNavAdminVisible = (rol) => {
+    if (!navAdmin) return;
+    if (token && rol === "ADMIN") navAdmin.removeAttribute("hidden");
+    else navAdmin.setAttribute("hidden", "");
+  };
+
+  if (navAdmin) navAdmin.setAttribute("hidden", "");
 
   if (!token) {
     ocultarSlot(slot, nameEl, rolEl);
@@ -89,6 +99,7 @@ export async function initSessionHeader() {
     aplicarUsuarioRol(nameEl, rolEl, claims.username, claims.rol);
     ensureSepBetweenNameAndRol();
     slot.removeAttribute("hidden");
+    setNavAdminVisible(claims.rol);
   }
 
   try {
@@ -97,9 +108,13 @@ export async function initSessionHeader() {
     aplicarUsuarioRol(nameEl, rolEl, u.username, u.rol);
     ensureSepBetweenNameAndRol();
     slot.removeAttribute("hidden");
-  } catch {
-    if (!claims) {
+    setNavAdminVisible(u.rol);
+  } catch (e) {
+    if (!claims || e.status === 401) {
       ocultarSlot(slot, nameEl, rolEl);
+      setNavAdminVisible(null);
+    } else {
+      setNavAdminVisible(claims.rol);
     }
   }
 }
