@@ -3,6 +3,7 @@ package com.pucmm.csti18104833.proyecto2;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoDatabase;
+import com.pucmm.csti18104833.proyecto2.auth.AdminUsuarioRoutes;
 import com.pucmm.csti18104833.proyecto2.auth.AuthRoutes;
 import com.pucmm.csti18104833.proyecto2.formulario.FormularioRoutes;
 import com.pucmm.csti18104833.proyecto2.config.AppConfig;
@@ -65,6 +66,7 @@ public class Proyecto2Application {
 
     private static void registerRoutes(Javalin app, MongoDatabase database, JwtService jwtService) {
         AuthRoutes.register(app, database, jwtService);
+        AdminUsuarioRoutes.register(app, database, jwtService);
         FormularioRoutes.register(app, database, jwtService);
         FormularioSyncWebSocket.register(app, database, jwtService);
 

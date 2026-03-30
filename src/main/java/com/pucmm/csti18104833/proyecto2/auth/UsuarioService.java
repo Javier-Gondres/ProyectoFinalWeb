@@ -3,13 +3,18 @@ package com.pucmm.csti18104833.proyecto2.auth;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.Updates;
 import com.pucmm.csti18104833.proyecto2.mongo.MongoCollections;
 import com.pucmm.csti18104833.proyecto2.security.AuthPrincipal;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.mindrot.jbcrypt.BCrypt;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
 public final class UsuarioService {
@@ -34,9 +39,7 @@ public final class UsuarioService {
         return Optional.ofNullable(doc);
     }
 
-    /**
-     * Registro público: siempre asigna rol {@link #ROL_ENCUESTADOR} si existe en la colección roles.
-     */
+    // Registro publico: asigna rol ENCUESTADOR si existe en la coleccion roles.
     public AuthPrincipal registrar(String username, String password, String nombreVisible) {
         if (!existeNombreRol(ROL_ENCUESTADOR)) {
             throw new IllegalStateException("Rol ENCUESTADOR no está definido en la base.");
@@ -66,27 +69,66 @@ public final class UsuarioService {
 
     public Optional<AuthPrincipal> autenticar(String username, String password) {
         Optional<Document> opt = buscarPorUsername(username);
-        if (opt.isEmpty()) {
+        if (!opt.isPresent()) {
             return Optional.empty();
         }
-        Document u = opt.get();
-        if (!BCrypt.checkpw(password, u.getString("passwordHash"))) {
+        Document docLogin = opt.get();
+        if (!BCrypt.checkpw(password, docLogin.getString("passwordHash"))) {
             return Optional.empty();
         }
-        return Optional.of(new AuthPrincipal(
-                u.getObjectId("_id"),
-                u.getString("username"),
-                u.getString("rol")));
+        AuthPrincipal ap = new AuthPrincipal(
+                docLogin.getObjectId("_id"),
+                docLogin.getString("username"),
+                docLogin.getString("rol"));
+        return Optional.of(ap);
     }
 
     public Optional<AuthPrincipal> buscarPrincipalPorId(ObjectId id) {
-        Document u = usuarios.find(Filters.eq("_id", id)).first();
-        if (u == null) {
+        Document docUsuario = usuarios.find(Filters.eq("_id", id)).first();
+        if (docUsuario == null) {
             return Optional.empty();
         }
-        return Optional.of(new AuthPrincipal(
-                u.getObjectId("_id"),
-                u.getString("username"),
-                u.getString("rol")));
+        AuthPrincipal bp = new AuthPrincipal(
+                docUsuario.getObjectId("_id"),
+                docUsuario.getString("username"),
+                docUsuario.getString("rol"));
+        return Optional.of(bp);
+    }
+
+    // Listado para administracion sin passwordHash.
+    public List<Document> listarUsuariosParaAdmin() {
+        List<Document> out = new ArrayList<>();
+        usuarios.find()
+                .sort(Sorts.ascending("username"))
+                .projection(Projections.include("_id", "username", "nombre", "rol", "creadoEn"))
+                .into(out);
+        return out;
+    }
+
+    // Cambia el rol; no deja la base sin ningun usuario ADMIN.
+    public Document actualizarRol(ObjectId usuarioId, String nuevoRol) {
+        if (!existeNombreRol(nuevoRol)) {
+            throw new IllegalArgumentException("Rol desconocido. Use un nombre definido en la colección roles.");
+        }
+        Document actual = usuarios.find(Filters.eq("_id", usuarioId)).first();
+        if (actual == null) {
+            throw new IllegalArgumentException("Usuario no encontrado.");
+        }
+        String anterior = actual.getString("rol");
+        if (anterior != null && anterior.equals(nuevoRol)) {
+            return actual;
+        }
+        if (ROL_ADMIN.equals(anterior) && !ROL_ADMIN.equals(nuevoRol)) {
+            long admins = usuarios.countDocuments(Filters.eq("rol", ROL_ADMIN));
+            if (admins <= 1) {
+                throw new IllegalArgumentException("Debe existir al menos un usuario con rol ADMIN.");
+            }
+        }
+        usuarios.updateOne(Filters.eq("_id", usuarioId), Updates.set("rol", nuevoRol));
+        Document post = usuarios.find(Filters.eq("_id", usuarioId)).first();
+        if (post == null) {
+            throw new IllegalArgumentException("Usuario actualizado no encontrado.");
+        }
+        return post;
     }
 }

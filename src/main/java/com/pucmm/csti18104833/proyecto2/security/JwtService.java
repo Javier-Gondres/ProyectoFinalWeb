@@ -1,7 +1,6 @@
 package com.pucmm.csti18104833.proyecto2.security;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.bson.types.ObjectId;
@@ -47,7 +46,8 @@ public final class JwtService {
                 return null;
             }
             return new AuthPrincipal(id, username, rol);
-        } catch (JwtException | IllegalArgumentException e) {
+        } catch (RuntimeException e) {
+            // JJWT lanza JwtException (subtipo de RuntimeException); ObjectId puede lanzar IllegalArgumentException.
             return null;
         }
     }
