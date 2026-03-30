@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d1219" />
+  <title>Usuarios — Administración</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700&display=swap" />
+  <link rel="stylesheet" href="/css/estilo.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a href="/" class="brand">
+      <span class="brand-mark">OP</span>
+      <span class="brand-text">Encuesta<span class="brand-sub">Administración</span></span>
+    </a>
+    <div class="header-tools">
+      <div id="sessionSlot" class="session-slot" hidden>
+        <span class="session-slot__user" id="sessionUserName"></span>
+        <span class="session-slot__rol" id="sessionUserRol"></span>
+      </div>
+      <nav class="nav-links" aria-label="Principal">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-link" href="/encuesta.html">Encuesta</a>
+        <a class="nav-link" href="/mapa.html">Mapa</a>
+        <a class="nav-link nav-link--active" href="/admin-usuarios.html" id="navAdmin" hidden>Administración</a>
+        <a class="nav-link nav-link--cta" href="/login.html" id="navLogin">Entrar</a>
+      </nav>
+    </div>
+  </header>
+  <main class="main-wide">
+    <h1 class="page-title">Usuarios y roles</h1>
+    <p class="page-lead">
+      Solo cuentas con rol <strong>ADMIN</strong> pueden cambiar roles. No se puede dejar el sistema sin al menos un administrador.
+      Si modifica su propio rol, cierre sesión y vuelva a entrar para actualizar el token.
+    </p>
+    <div class="card">
+      <p class="card-title">Listado</p>
+      <div class="admin-table-wrap">
+        <table class="admin-table" aria-label="Usuarios registrados">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Nombre</th>
+              <th>Rol</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbodyUsuarios"></tbody>
+        </table>
+      </div>
+      <div id="msg"></div>
+    </div>
+  </main>
+  <footer class="site-footer">Encuesta OP · Administración</footer>
+  <script type="module" src="/js/admin-usuarios.js"></script>
+</body>
+</html>
