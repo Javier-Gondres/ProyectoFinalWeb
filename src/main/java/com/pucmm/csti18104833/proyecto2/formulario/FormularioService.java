@@ -76,12 +76,12 @@ public final class FormularioService {
     }
 
     /**
-     * Listado según rol (ADMIN ve todo; resto solo lo propio).
+     * Listado según rol (ADMIN y SUPER_ADMIN ven todo; resto solo lo propio).
      *
      * @param incluirImagenBase64 si false, excluye el campo imagenBase64 de cada documento.
      */
     public List<Document> listarVisiblePor(AuthPrincipal viewer, boolean incluirImagenBase64) {
-        Bson filtro = UsuarioService.ROL_ADMIN.equals(viewer.rol())
+        Bson filtro = UsuarioService.esRolGestorFormularios(viewer.rol())
                 ? null
                 : Filters.eq("usuarioRegistroId", viewer.id());
         List<Document> out = new ArrayList<>();
@@ -98,7 +98,7 @@ public final class FormularioService {
     }
 
     public boolean puedeVer(AuthPrincipal viewer, Document formulario) {
-        if (UsuarioService.ROL_ADMIN.equals(viewer.rol())) {
+        if (UsuarioService.esRolGestorFormularios(viewer.rol())) {
             return true;
         }
         return formulario.getObjectId("usuarioRegistroId").equals(viewer.id());
