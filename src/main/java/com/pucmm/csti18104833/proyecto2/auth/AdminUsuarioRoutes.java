@@ -25,7 +25,7 @@ public final class AdminUsuarioRoutes {
         UsuarioService usuarios = new UsuarioService(database);
 
         app.get("/api/admin/usuarios", ctx -> {
-            if (denyUnlessAdmin(ctx, jwtService)) {
+            if (requireAdmin(ctx, jwtService).isEmpty()) {
                 return;
             }
             List<Document> docs = usuarios.listarUsuariosParaAdmin();
@@ -35,9 +35,11 @@ public final class AdminUsuarioRoutes {
         });
 
         app.patch("/api/admin/usuarios/{id}", ctx -> {
-            if (denyUnlessAdmin(ctx, jwtService)) {
+            Optional<AuthPrincipal> adminOpt = requireSuperAdmin(ctx, jwtService);
+            if (adminOpt.isEmpty()) {
                 return;
             }
+            AuthPrincipal actor = adminOpt.get();
             ObjectId id;
             try {
                 id = new ObjectId(ctx.pathParam("id"));
@@ -57,7 +59,7 @@ public final class AdminUsuarioRoutes {
                 return;
             }
             try {
-                Document actualizado = usuarios.actualizarRol(id, body.rol().trim());
+                Document actualizado = usuarios.actualizarRol(id, body.rol().trim(), actor);
                 ctx.json(Map.of("usuario", docToJson(actualizado)));
             } catch (IllegalArgumentException e) {
                 ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
@@ -65,18 +67,33 @@ public final class AdminUsuarioRoutes {
         });
     }
 
-    /** @return true si ya se respondió con error (401 o 403). */
-    private static boolean denyUnlessAdmin(io.javalin.http.Context ctx, JwtService jwtService) {
+    /**
+     * @return vacío si ya respondió 401/403; si no, el {@link AuthPrincipal} ADMIN autenticado.
+     */
+    private static Optional<AuthPrincipal> requireAdmin(io.javalin.http.Context ctx, JwtService jwtService) {
         Optional<AuthPrincipal> opt = BearerAuth.parsePrincipal(ctx.header("Authorization"), jwtService);
         if (opt.isEmpty()) {
             ctx.status(HttpStatus.UNAUTHORIZED).json(Map.of("error", "Token inválido o ausente."));
-            return true;
+            return Optional.empty();
         }
-        if (!UsuarioService.ROL_ADMIN.equals(opt.get().rol())) {
-            ctx.status(HttpStatus.FORBIDDEN).json(Map.of("error", "Se requiere rol ADMIN."));
-            return true;
+        if (!UsuarioService.esRolStaffAdministracion(opt.get().rol())) {
+            ctx.status(HttpStatus.FORBIDDEN).json(Map.of("error", "Se requiere rol ADMIN o SUPER_ADMIN."));
+            return Optional.empty();
         }
-        return false;
+        return opt;
+    }
+
+    private static Optional<AuthPrincipal> requireSuperAdmin(io.javalin.http.Context ctx, JwtService jwtService) {
+        Optional<AuthPrincipal> opt = BearerAuth.parsePrincipal(ctx.header("Authorization"), jwtService);
+        if (opt.isEmpty()) {
+            ctx.status(HttpStatus.UNAUTHORIZED).json(Map.of("error", "Token inválido o ausente."));
+            return Optional.empty();
+        }
+        if (!UsuarioService.ROL_SUPER_ADMIN.equals(opt.get().rol())) {
+            ctx.status(HttpStatus.FORBIDDEN).json(Map.of("error", "Solo SUPER_ADMIN puede modificar roles."));
+            return Optional.empty();
+        }
+        return opt;
     }
 
     private static Map<String, Object> docToJson(Document d) {

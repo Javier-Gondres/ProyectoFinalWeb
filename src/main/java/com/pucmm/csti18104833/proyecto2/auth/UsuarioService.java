@@ -21,6 +21,18 @@ public final class UsuarioService {
 
     public static final String ROL_ENCUESTADOR = "ENCUESTADOR";
     public static final String ROL_ADMIN = "ADMIN";
+    /** Puede gestionar roles de cualquier usuario (incluidos otros ADMIN). */
+    public static final String ROL_SUPER_ADMIN = "SUPER_ADMIN";
+
+    /** Ve todos los formularios como ADMIN. */
+    public static boolean esRolGestorFormularios(String rol) {
+        return ROL_ADMIN.equals(rol) || ROL_SUPER_ADMIN.equals(rol);
+    }
+
+    /** Puede acceder a /api/admin (listar usuarios, etc.). */
+    public static boolean esRolStaffAdministracion(String rol) {
+        return ROL_ADMIN.equals(rol) || ROL_SUPER_ADMIN.equals(rol);
+    }
 
     private final MongoCollection<Document> usuarios;
     private final MongoCollection<Document> roles;
@@ -105,10 +117,20 @@ public final class UsuarioService {
         return out;
     }
 
-    // Cambia el rol; no deja la base sin ningun usuario ADMIN.
-    public Document actualizarRol(ObjectId usuarioId, String nuevoRol) {
+    /**
+     * Cambia el rol. Solo {@link #ROL_SUPER_ADMIN} puede modificar roles; no puede cambiar el suyo propio.
+     * No se permite asignar ni modificar cuentas con rol {@link #ROL_SUPER_ADMIN} por este endpoint.
+     * No deja el sistema sin ningún usuario con rol ADMIN o SUPER_ADMIN (salvo el propio cambio).
+     */
+    public Document actualizarRol(ObjectId usuarioId, String nuevoRol, AuthPrincipal actor) {
         if (!existeNombreRol(nuevoRol)) {
             throw new IllegalArgumentException("Rol desconocido. Use un nombre definido en la colección roles.");
+        }
+        if (!ROL_SUPER_ADMIN.equals(actor.rol())) {
+            throw new IllegalArgumentException("Solo SUPER_ADMIN puede modificar roles.");
+        }
+        if (usuarioId.equals(actor.id())) {
+            throw new IllegalArgumentException("Un SUPER_ADMIN no puede modificar su propio rol.");
         }
         Document actual = usuarios.find(Filters.eq("_id", usuarioId)).first();
         if (actual == null) {
@@ -118,10 +140,19 @@ public final class UsuarioService {
         if (anterior != null && anterior.equals(nuevoRol)) {
             return actual;
         }
-        if (ROL_ADMIN.equals(anterior) && !ROL_ADMIN.equals(nuevoRol)) {
-            long admins = usuarios.countDocuments(Filters.eq("rol", ROL_ADMIN));
-            if (admins <= 1) {
-                throw new IllegalArgumentException("Debe existir al menos un usuario con rol ADMIN.");
+        if (ROL_SUPER_ADMIN.equals(nuevoRol)) {
+            throw new IllegalArgumentException("No se permite asignar el rol SUPER_ADMIN desde este endpoint.");
+        }
+        if (ROL_SUPER_ADMIN.equals(anterior)) {
+            throw new IllegalArgumentException("No se permite modificar el rol de un usuario SUPER_ADMIN.");
+        }
+        if (esRolGestorFormularios(anterior) && !esRolGestorFormularios(nuevoRol)) {
+            long otrosGestores = usuarios.countDocuments(Filters.and(
+                    Filters.in("rol", List.of(ROL_ADMIN, ROL_SUPER_ADMIN)),
+                    Filters.ne("_id", usuarioId)));
+            if (otrosGestores == 0) {
+                throw new IllegalArgumentException(
+                        "Debe existir al menos otro usuario con rol ADMIN o SUPER_ADMIN aparte de este.");
             }
         }
         usuarios.updateOne(Filters.eq("_id", usuarioId), Updates.set("rol", nuevoRol));
