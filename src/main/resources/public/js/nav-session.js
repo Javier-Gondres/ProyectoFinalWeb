@@ -2,6 +2,7 @@ import { tokenActual, cerrarSesion } from "./auth.js";
 import { apiJson } from "./api.js";
 
 const ROL_LABEL = {
+  SUPER_ADMIN: "Super administrador",
   ADMIN: "Administrador",
   ENCUESTADOR: "Encuestador",
 };
@@ -63,10 +64,10 @@ export async function initSessionHeader() {
 
   if (!slot || !nameEl || !rolEl) return;
 
-  /** Solo visible con sesión válida y rol ADMIN (la API sigue validando). */
+  /** Solo visible con sesión válida y rol ADMIN o SUPER_ADMIN (la API sigue validando). */
   const setNavAdminVisible = (rol) => {
     if (!navAdmin) return;
-    if (token && rol === "ADMIN") navAdmin.removeAttribute("hidden");
+    if (token && (rol === "ADMIN" || rol === "SUPER_ADMIN")) navAdmin.removeAttribute("hidden");
     else navAdmin.setAttribute("hidden", "");
   };
 
