@@ -20,7 +20,8 @@ public final class MongoDatabaseInitializer {
 
     public static void initialize(MongoDatabase db) {
         seedRoles(db);
-        seedBootstrapAdmin(db);
+        ensureSuperAdminRole(db);
+        seedBootstrapSuperAdmin(db);
         ensureUsuariosIndexes(db);
         ensureFormulariosIndexes(db);
     }
@@ -32,19 +33,37 @@ public final class MongoDatabaseInitializer {
             return;
         }
         roles.insertMany(List.of(
+                new Document("nombre", "SUPER_ADMIN").append("descripcion", "Super administrador"),
                 new Document("nombre", "ADMIN").append("descripcion", "Administración"),
                 new Document("nombre", "ENCUESTADOR").append("descripcion", "Levantamiento de encuestas")
         ));
     }
 
+    /** Bases ya pobladas antes de existir SUPER_ADMIN: inserta el rol si falta. */
+    private static void ensureSuperAdminRole(MongoDatabase db) {
+        MongoCollection<Document> roles = db.getCollection(MongoCollections.ROLES);
+        if (roles.find(Filters.eq("nombre", "SUPER_ADMIN")).first() != null) {
+            return;
+        }
+        roles.insertOne(new Document("nombre", "SUPER_ADMIN").append("descripcion", "Super administrador"));
+    }
+
     /**
-     * Opcional: si existen {@code ADMIN_BOOTSTRAP_USERNAME} y {@code ADMIN_BOOTSTRAP_PASSWORD}
-     * en el entorno y aún no hay un usuario con ese nombre, crea un ADMIN (solo arranque).
+     * Opcional: si existen variables de entorno (o .env) de arranque y el usuario no existe, crea un
+     * {@code SUPER_ADMIN}. Preferencia: {@code SUPER_ADMIN_BOOTSTRAP_*}, si no {@code ADMIN_BOOTSTRAP_*} (compatibilidad).
      */
-    private static void seedBootstrapAdmin(MongoDatabase db) {
+    private static void seedBootstrapSuperAdmin(MongoDatabase db) {
         Map<String, String> dot = DotEnv.findAndLoad();
-        String rawUser = firstNonBlank(System.getenv("ADMIN_BOOTSTRAP_USERNAME"), dot.get("ADMIN_BOOTSTRAP_USERNAME"));
-        String rawPass = firstNonBlank(System.getenv("ADMIN_BOOTSTRAP_PASSWORD"), dot.get("ADMIN_BOOTSTRAP_PASSWORD"));
+        String rawUser = firstNonBlank(
+                System.getenv("SUPER_ADMIN_BOOTSTRAP_USERNAME"),
+                dot.get("SUPER_ADMIN_BOOTSTRAP_USERNAME"),
+                System.getenv("ADMIN_BOOTSTRAP_USERNAME"),
+                dot.get("ADMIN_BOOTSTRAP_USERNAME"));
+        String rawPass = firstNonBlank(
+                System.getenv("SUPER_ADMIN_BOOTSTRAP_PASSWORD"),
+                dot.get("SUPER_ADMIN_BOOTSTRAP_PASSWORD"),
+                System.getenv("ADMIN_BOOTSTRAP_PASSWORD"),
+                dot.get("ADMIN_BOOTSTRAP_PASSWORD"));
         if (rawUser == null || rawUser.isBlank() || rawPass == null || rawPass.isBlank()) {
             return;
         }
@@ -60,16 +79,18 @@ public final class MongoDatabaseInitializer {
         usuarios.insertOne(new Document("username", username)
                 .append("passwordHash", hash)
                 .append("nombre", username)
-                .append("rol", "ADMIN")
+                .append("rol", "SUPER_ADMIN")
                 .append("creadoEn", new Date()));
     }
 
-    private static String firstNonBlank(String a, String b) {
-        if (a != null && !a.isBlank()) {
-            return a.trim();
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
         }
-        if (b != null && !b.isBlank()) {
-            return b.trim();
+        for (String v : values) {
+            if (v != null && !v.isBlank()) {
+                return v.trim();
+            }
         }
         return null;
     }
