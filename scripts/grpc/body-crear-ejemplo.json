@@ -1,0 +1,8 @@
+{
+  "nombre": "Prueba gRPC",
+  "sector": "Sector ejemplo",
+  "nivelEscolar": "MEDIO",
+  "latitud": 18.4861,
+  "longitud": -69.9312,
+  "imagenBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+}

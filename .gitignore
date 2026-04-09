@@ -48,5 +48,8 @@ Prueba.md
 .env
 .env.local
 
+### JWT local para scripts gRPC (scripts/grpc/login.ps1)
+scripts/grpc/.jwt
+
 ### Base de datos H2 (local)
 data/
