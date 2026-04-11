@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d1219" />
+  <title>Cliente gRPC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/estilo.css" />
+  <style>
+    .grpc-page .page-lead {
+      max-width: 48rem;
+    }
+    .grpc-banner {
+      padding: 0.85rem 1rem;
+      border-radius: var(--radius);
+      background: var(--accent-dim);
+      border: 1px solid var(--border-strong);
+      margin-bottom: 1.25rem;
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      word-break: break-word;
+    }
+    .grpc-banner strong { color: var(--text); }
+    .grpc-banner code {
+      display: inline-block;
+      margin: 0.15rem 0;
+      padding: 0.15rem 0.4rem;
+      border-radius: 6px;
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-size: 0.82rem;
+    }
+    .grpc-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+    .grpc-stack .card {
+      margin-bottom: 0;
+    }
+    .grpc-table-wrap {
+      overflow-x: auto;
+      margin-top: 1rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    table.grpc-table {
+      width: 100%;
+      min-width: 420px;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    table.grpc-table th,
+    table.grpc-table td {
+      padding: 0.55rem 0.65rem;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    table.grpc-table thead th {
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: var(--bg-elevated);
+    }
+    table.grpc-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+    table.grpc-table code {
+      font-size: 0.75rem;
+      word-break: break-all;
+    }
+    .grpc-inline-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      margin: 0 0 1rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .grpc-inline-check input {
+      width: auto;
+      margin-top: 0.2rem;
+      accent-color: var(--accent);
+    }
+    .grpc-empty {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding: 1.25rem 0.5rem;
+    }
+    table.grpc-table tbody tr.grpc-row {
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+    table.grpc-table tbody tr.grpc-row:hover {
+      background: var(--bg-elevated);
+    }
+    table.grpc-table tbody tr.grpc-row:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+    .grpc-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(6px);
+    }
+    .grpc-modal-backdrop[hidden] {
+      display: none !important;
+    }
+    .grpc-modal {
+      position: relative;
+      max-width: 400px;
+      width: 100%;
+      max-height: min(90vh, 560px);
+      overflow: auto;
+      margin: 0;
+    }
+    .grpc-modal__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .grpc-modal__title {
+      margin: 0;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+    .grpc-modal__close {
+      width: 2.25rem;
+      height: 2.25rem;
+      padding: 0;
+      margin: 0;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: var(--bg-elevated);
+      color: var(--text);
+      font-size: 1.35rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .grpc-modal__close:hover {
+      background: var(--card-hover);
+    }
+    .grpc-modal__body .map-popup {
+      margin: 0;
+      box-shadow: none;
+      border: none;
+      padding: 0;
+      background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a href="/" class="brand" aria-label="Inicio">
+      <span class="brand-mark">OP</span>
+      <span class="brand-text">Encuesta<span class="brand-sub">Cliente gRPC</span></span>
+    </a>
+    <div class="header-tools">
+      <div id="sessionSlot" class="session-slot" hidden>
+        <span class="session-slot__user" id="sessionUserName"></span>
+        <span class="session-slot__rol" id="sessionUserRol"></span>
+      </div>
+      <nav class="nav-links" aria-label="Principal">
+        <a class="nav-link" href="/">Inicio</a>
+        <a class="nav-link" href="/encuesta.html">Encuesta</a>
+        <a class="nav-link" href="/mapa.html">Mapa</a>
+        <a class="nav-link nav-link--active" href="/grpc-web/index.html" id="navGrpc" hidden>gRPC</a>
+        <a class="nav-link" href="/admin-usuarios.html" id="navAdmin" hidden>Administración</a>
+        <a class="nav-link nav-link--cta" href="/login.html" id="navLogin">Entrar</a>
+      </nav>
+    </div>
+  </header>
+  <main class="main-wide grpc-page">
+    <h1 class="page-title">Cliente gRPC</h1>
+    <p class="page-lead">Gestion del formulario con gRPC.</p>
+
+    <div id="bannerEdicionGrpc" class="banner-edicion" hidden>
+      <span id="bannerEdicionTextoGrpc"></span>
+      <button type="button" class="secondary" id="btnCancelarEdicionGrpc" hidden>Cancelar edición</button>
+    </div>
+
+    <div class="grpc-stack">
+      <section class="card" aria-labelledby="grpc-h-list">
+        <p class="card-title" id="grpc-h-list">Listar formularios</p>
+        <div class="btn-row btn-row--start">
+          <button type="button" id="btnListar">Listar formularios</button>
+        </div>
+        <div id="grpcListError" class="msg err" hidden role="alert"></div>
+        <div class="grpc-table-wrap">
+          <table class="grpc-table" aria-label="Formularios devueltos por gRPC">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Sector</th>
+                <th>Nivel</th>
+                <th>Creado</th>
+              </tr>
+            </thead>
+            <tbody id="grpcListBody">
+              <tr>
+                <td colspan="4" class="grpc-empty"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="grpc-h-create">
+        <p class="card-title" id="grpc-h-create">Formulario</p>
+        <form id="grpcCrear">
+          <div class="form-section">
+            <h2 class="form-section-title">Datos del encuestado</h2>
+            <label>Nombre completo<input name="nombre" required maxlength="200" autocomplete="name" placeholder="Nombre y apellido" /></label>
+            <label>Sector o comunidad<input name="sector" required maxlength="200" placeholder="Barrio, distrito, etc." /></label>
+            <label>Nivel escolar
+              <select name="nivelEscolar" required>
+                <option value="">Seleccione una opción</option>
+                <option value="BASICO">Básico</option>
+                <option value="MEDIO">Medio</option>
+                <option value="GRADO_UNIVERSITARIO">Grado universitario</option>
+                <option value="POSTGRADO">Postgrado</option>
+                <option value="DOCTORADO">Doctorado</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-section">
+            <h2 class="form-section-title">Ubicación</h2>
+            <div class="form-grid-2">
+              <label>Latitud<input name="latitud" id="grpcLat" type="number" step="any" required placeholder="18.xxx" /></label>
+              <label>Longitud<input name="longitud" id="grpcLon" type="number" step="any" required placeholder="-70.xxx" /></label>
+            </div>
+            <p class="field-hint">Permiso del navegador necesario para usar el GPS.</p>
+            <div class="btn-row btn-row--start">
+              <button type="button" class="secondary" id="grpcBtnGeo">Obtener ubicación actual</button>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h2 class="form-section-title">Fotografía</h2>
+            <div id="grpcFotoInputBlock">
+              <label>Archivo o foto desde el teléfono
+                <input type="file" id="grpcFotoFile" accept="image/*" capture="environment" />
+              </label>
+            </div>
+            <div id="grpcFotoResumen" class="foto-resumen" hidden>
+              <div class="foto-resumen__columna">
+                <p class="foto-resumen__titulo-prev">Vista previa de la fotografía</p>
+                <div class="foto-resumen__preview-wrap">
+                  <img id="grpcFotoPreview" class="foto-resumen__img" alt="" width="140" height="140" decoding="async" />
+                </div>
+                <p id="grpcFotoEstadoTexto" class="foto-resumen__estado"></p>
+                <button type="button" class="secondary" id="grpcBtnCambiarFoto">Cambiar foto</button>
+              </div>
+            </div>
+            <div class="webcam-wrap" id="grpcWebcamContainer" hidden>
+              <video id="grpcWebcam" playsinline autoplay muted width="640" height="360"></video>
+            </div>
+            <canvas id="grpcFotoCanvas" hidden></canvas>
+            <div class="btn-row">
+              <button type="button" class="secondary" id="grpcBtnCam">Iniciar webcam</button>
+              <button type="button" class="secondary" id="grpcBtnFoto" hidden>Capturar foto</button>
+            </div>
+            <input type="hidden" name="imagenBase64" id="grpcImagenBase64" />
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="grpcBtnEnviar">Enviar al servidor</button>
+            <button type="button" class="secondary" id="grpcBtnLocal">Guardar en cola local</button>
+          </div>
+        </form>
+        <div id="grpcMsg"></div>
+      </section>
+
+      <section class="card" aria-labelledby="grpc-h-queue">
+        <p class="card-title" id="grpc-h-queue">Cola local</p>
+        <p class="page-lead" style="margin-bottom: 1rem; font-size: 0.9rem">
+          Borradores en este dispositivo. Puede editarlos antes de sincronizar. Sincronizar cuando haya conexión.
+        </p>
+        <ul id="grpcPendientes" class="queue-list"></ul>
+        <div class="btn-row btn-row--start">
+          <button type="button" id="grpcBtnSyncWs">Sincronizar cola</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="grpcModalBackdrop" class="grpc-modal-backdrop" hidden>
+    <div class="grpc-modal card" role="dialog" aria-modal="true" aria-labelledby="grpcModalTitle" tabindex="-1">
+      <div class="grpc-modal__head">
+        <h2 id="grpcModalTitle" class="grpc-modal__title">Detalle del formulario</h2>
+        <button type="button" class="grpc-modal__close" id="grpcModalClose" aria-label="Cerrar">×</button>
+      </div>
+      <div id="grpcModalBody" class="grpc-modal__body"></div>
+    </div>
+  </div>
+
+  <footer class="site-footer">Cliente gRPC</footer>
+  <script src="/js/vendor/webcam-easy.min.js"></script>
+  <script type="module">
+    import { tokenActual } from "/js/auth.js";
+    import { initGrpcWebPage } from "/grpc-web/app.js";
+    import { initSessionHeader } from "/js/nav-session.js";
+
+    if (!tokenActual()) {
+      window.location.href = "/login.html";
+    } else {
+      initGrpcWebPage();
+      initSessionHeader();
+    }
+  </script>
+</body>
+</html>

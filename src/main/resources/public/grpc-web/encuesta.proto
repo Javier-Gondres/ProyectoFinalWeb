@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package proyecto2.encuesta;
+
+option java_multiple_files = true;
+option java_package = "com.pucmm.csti18104833.proyecto2.grpc";
+option java_outer_classname = "EncuestaProto";
+
+message Formulario {
+  string id = 1;
+  string usuario_registro_id = 2;
+  string usuario_registro_username = 3;
+  string nombre = 4;
+  string sector = 5;
+  string nivel_escolar = 6;
+  double latitud = 7;
+  double longitud = 8;
+  string imagen_base64 = 9;
+  int64 creado_en_millis = 10;
+}
+
+message ListarFormulariosRequest {
+  bool incluir_imagen_base64 = 1;
+}
+
+message ListarFormulariosReply {
+  repeated Formulario formularios = 1;
+}
+
+message CrearFormularioRequest {
+  string nombre = 1;
+  string sector = 2;
+  string nivel_escolar = 3;
+  double latitud = 4;
+  double longitud = 5;
+  string imagen_base64 = 6;
+}
+
+message CrearFormularioReply {
+  Formulario formulario = 1;
+}
+
+service EncuestaService {
+  rpc ListarFormularios(ListarFormulariosRequest) returns (ListarFormulariosReply);
+  rpc CrearFormulario(CrearFormularioRequest) returns (CrearFormularioReply);
+}
