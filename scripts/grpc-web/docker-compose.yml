@@ -1,0 +1,11 @@
+# Desde la raíz del repo para que funcione: docker compose -f scripts/grpc-web/docker-compose.yml up
+services:
+  grpcweb-envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    ports:
+      - "7080:7080"
+      - "9901:9901"
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
