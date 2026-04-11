@@ -71,7 +71,15 @@ export async function initSessionHeader() {
     else navAdmin.setAttribute("hidden", "");
   };
 
+  const navGrpc = document.getElementById("navGrpc");
+  const setNavGrpcVisible = (visible) => {
+    if (!navGrpc) return;
+    if (visible) navGrpc.removeAttribute("hidden");
+    else navGrpc.setAttribute("hidden", "");
+  };
+
   if (navAdmin) navAdmin.setAttribute("hidden", "");
+  setNavGrpcVisible(false);
 
   if (!token) {
     ocultarSlot(slot, nameEl, rolEl);
@@ -101,6 +109,7 @@ export async function initSessionHeader() {
     ensureSepBetweenNameAndRol();
     slot.removeAttribute("hidden");
     setNavAdminVisible(claims.rol);
+    setNavGrpcVisible(true);
   }
 
   try {
@@ -110,12 +119,15 @@ export async function initSessionHeader() {
     ensureSepBetweenNameAndRol();
     slot.removeAttribute("hidden");
     setNavAdminVisible(u.rol);
+    setNavGrpcVisible(true);
   } catch (e) {
     if (!claims || e.status === 401) {
       ocultarSlot(slot, nameEl, rolEl);
       setNavAdminVisible(null);
+      setNavGrpcVisible(false);
     } else {
       setNavAdminVisible(claims.rol);
+      setNavGrpcVisible(true);
     }
   }
 }
