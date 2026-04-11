@@ -1,6 +1,7 @@
 import { tokenActual } from "./auth.js";
 import { apiJson, wsSyncUrl } from "./api.js";
 import { initSessionHeader } from "./nav-session.js";
+import { guardarPendiente, listarPendientes, borrarPendiente, actualizarPendiente } from "./colas-local.js";
 
 if (!tokenActual()) {
   window.location.href = "/login.html";
@@ -12,78 +13,8 @@ if (!tokenActual()) {
 }
 
 function initEncuesta() {
-  const DB = "encuesta_offline_v1";
-  const STORE = "pendientes";
   /** Si no es null, el formulario actualiza este borrador en cola al guardar local. */
   let editingLocalId = null;
-
-  function openDb() {
-    return new Promise((res, rej) => {
-      const r = indexedDB.open(DB, 1);
-      r.onerror = () => rej(r.error);
-      r.onupgradeneeded = () => r.result.createObjectStore(STORE, { keyPath: "localId", autoIncrement: true });
-      r.onsuccess = () => res(r.result);
-    });
-  }
-
-  async function guardarPendiente(payload) {
-    const db = await openDb();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).add({ ...payload, creadoLocal: Date.now() });
-      tx.oncomplete = () => res();
-      tx.onerror = () => rej(tx.error);
-    });
-  }
-
-  async function listarPendientes() {
-    const db = await openDb();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, "readonly");
-      const q = tx.objectStore(STORE).getAll();
-      q.onsuccess = () => res(q.result || []);
-      q.onerror = () => rej(q.error);
-    });
-  }
-
-  async function borrarPendiente(localId) {
-    const db = await openDb();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).delete(localId);
-      tx.oncomplete = () => res();
-      tx.onerror = () => rej(tx.error);
-    });
-  }
-
-  async function actualizarPendiente(localId, payload) {
-    const db = await openDb();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, "readwrite");
-      const store = tx.objectStore(STORE);
-      const r = store.get(localId);
-      r.onsuccess = () => {
-        const prev = r.result;
-        if (!prev) {
-          rej(new Error("Borrador no encontrado."));
-          return;
-        }
-        store.put({
-          localId,
-          creadoLocal: prev.creadoLocal,
-          nombre: payload.nombre,
-          sector: payload.sector,
-          nivelEscolar: payload.nivelEscolar,
-          latitud: payload.latitud,
-          longitud: payload.longitud,
-          imagenBase64: payload.imagenBase64,
-        });
-      };
-      r.onerror = () => rej(r.error);
-      tx.oncomplete = () => res();
-      tx.onerror = () => rej(tx.error);
-    });
-  }
 
   function leerFormulario() {
     const nombre = document.querySelector('[name="nombre"]').value.trim();
