@@ -1,5 +1,6 @@
 package com.pucmm.csti18104833.proyecto2.formulario;
 
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
@@ -18,6 +19,9 @@ import java.util.List;
 import java.util.Optional;
 
 public final class FormularioService {
+
+    public static final int LISTA_PAGE_SIZE_DEFAULT = 10;
+    public static final int LISTA_PAGE_SIZE_MAX = 100;
 
     private final MongoCollection<Document> formularios;
 
@@ -76,22 +80,31 @@ public final class FormularioService {
     }
 
     /**
-     * Listado según rol (ADMIN y SUPER_ADMIN ven todo; resto solo lo propio).
+     * Listado paginado según rol (ADMIN y SUPER_ADMIN ven todo; resto solo lo propio).
      *
+     * @param page página 1-based
+     * @param pageSize tamaño (se limita a {@link #LISTA_PAGE_SIZE_MAX})
      * @param incluirImagenBase64 si false, excluye el campo imagenBase64 de cada documento.
      */
-    public List<Document> listarVisiblePor(AuthPrincipal viewer, boolean incluirImagenBase64) {
+    public FormularioListadoPaginado listarVisiblePorPaginado(
+            AuthPrincipal viewer, boolean incluirImagenBase64, int page, int pageSize) {
+        int p = Math.max(1, page);
+        int ps = Math.min(Math.max(1, pageSize), LISTA_PAGE_SIZE_MAX);
         Bson filtro = UsuarioService.esRolGestorFormularios(viewer.rol())
                 ? null
                 : Filters.eq("usuarioRegistroId", viewer.id());
+        long total = filtro == null ? formularios.countDocuments() : formularios.countDocuments(filtro);
         List<Document> out = new ArrayList<>();
-        var query = filtro == null ? formularios.find() : formularios.find(filtro);
+        FindIterable<Document> query = filtro == null ? formularios.find() : formularios.find(filtro);
         if (!incluirImagenBase64) {
             query = query.projection(new Document("imagenBase64", 0));
         }
-        query.sort(Sorts.descending("creadoEn")).into(out);
-        return out;
+        int skip = (p - 1) * ps;
+        query.sort(Sorts.descending("creadoEn")).skip(skip).limit(ps).into(out);
+        return new FormularioListadoPaginado(out, total, p, ps);
     }
+
+    public record FormularioListadoPaginado(List<Document> items, long total, int page, int pageSize) {}
 
     public Optional<Document> buscarPorId(ObjectId id) {
         return Optional.ofNullable(formularios.find(Filters.eq("_id", id)).first());

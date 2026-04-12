@@ -8,8 +8,6 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import org.bson.Document;
 
-import java.util.List;
-
 public final class EncuestaGrpcServiceImpl extends EncuestaServiceGrpc.EncuestaServiceImplBase {
 
     private final FormularioService formularioService;
@@ -29,11 +27,20 @@ public final class EncuestaGrpcServiceImpl extends EncuestaServiceGrpc.EncuestaS
         }
         try {
             boolean incluirImagen = request.getIncluirImagenBase64();
-            List<Document> docs = formularioService.listarVisiblePor(p, incluirImagen);
+            int page = request.getPage() <= 0 ? 1 : request.getPage();
+            int pageSize =
+                    request.getPageSize() <= 0
+                            ? FormularioService.LISTA_PAGE_SIZE_DEFAULT
+                            : request.getPageSize();
+            FormularioService.FormularioListadoPaginado listado =
+                    formularioService.listarVisiblePorPaginado(p, incluirImagen, page, pageSize);
             ListarFormulariosReply.Builder reply = ListarFormulariosReply.newBuilder();
-            for (Document d : docs) {
+            for (Document d : listado.items()) {
                 reply.addFormularios(FormularioProtoMapper.toProto(d));
             }
+            reply.setTotal(listado.total());
+            reply.setPage(listado.page());
+            reply.setPageSize(listado.pageSize());
             responseObserver.onNext(reply.build());
             responseObserver.onCompleted();
         } catch (Exception e) {

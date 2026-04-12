@@ -12,7 +12,6 @@ import org.bson.types.ObjectId;
 
 import com.mongodb.client.MongoDatabase;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -31,8 +30,25 @@ public final class FormularioRoutes {
                 return;
             }
             AuthPrincipal p = authOpt.get();
-            List<Document> docs = service.listarVisiblePor(p, false);
-            ctx.json(Map.of("formularios", docs.stream().map(FormularioRoutes::docToJson).collect(Collectors.toList())));
+            int page = Math.max(1, parseQueryInt(ctx.queryParam("page"), 1));
+            int pageSize =
+                    parseQueryInt(ctx.queryParam("pageSize"), FormularioService.LISTA_PAGE_SIZE_DEFAULT);
+            FormularioService.FormularioListadoPaginado listado =
+                    service.listarVisiblePorPaginado(p, false, page, pageSize);
+            long total = listado.total();
+            int ps = listado.pageSize();
+            int totalPages = ps > 0 ? (int) Math.ceil((double) total / ps) : 0;
+            ctx.json(Map.of(
+                    "formularios",
+                    listado.items().stream().map(FormularioRoutes::docToJson).collect(Collectors.toList()),
+                    "total",
+                    total,
+                    "page",
+                    listado.page(),
+                    "pageSize",
+                    ps,
+                    "totalPages",
+                    totalPages));
         });
 
         app.get("/api/formularios/{id}", ctx -> {
@@ -103,6 +119,17 @@ public final class FormularioRoutes {
                 ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
             }
         });
+    }
+
+    private static int parseQueryInt(String raw, int defaultValue) {
+        if (raw == null || raw.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(raw.trim());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 
     private static Map<String, Object> docToJson(Document d) {
