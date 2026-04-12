@@ -121,7 +121,20 @@ async function loadProto() {
   }
 
   try {
-    protoRoot = protobuf.parse(text);
+    const RootCtor = protobuf.Root;
+    if (typeof RootCtor === "function") {
+      protoRoot = new RootCtor();
+      protobuf.parse(text, protoRoot);
+    } else {
+      const parsed = protobuf.parse(text);
+      protoRoot =
+        parsed && typeof /** @type {{ lookup?: unknown }} */ (parsed).lookup === "function"
+          ? /** @type {import('protobufjs').Root} */ (parsed)
+          : /** @type {{ root?: import('protobufjs').Root }} */ (parsed).root;
+    }
+    if (!protoRoot || typeof protoRoot.lookup !== "function") {
+      throw new Error("El esquema protobuf no produjo un Root válido.");
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error("No se pudo leer encuesta.proto: " + msg);
@@ -386,6 +399,10 @@ function $(id) {
 export function initGrpcWebPage() {
   const elListErr = document.getElementById("grpcListError");
   const elList = document.getElementById("grpcListBody");
+  const elGrpcPag = $("grpcPagination");
+  const elGrpcPagInfo = $("grpcPaginationInfo");
+  const btnGrpcListPrev = $("grpcListPrev");
+  const btnGrpcListNext = $("grpcListNext");
   const elGrpcMsg = document.getElementById("grpcMsg");
   const elFormCrear = /** @type {HTMLFormElement | null} */ (document.getElementById("grpcCrear"));
   const elBackdrop = document.getElementById("grpcModalBackdrop");
@@ -624,7 +641,32 @@ export function initGrpcWebPage() {
     if (e.key === "Escape" && elBackdrop && !elBackdrop.hidden) closeDetalleModal();
   });
 
-  document.getElementById("btnListar")?.addEventListener("click", async () => {
+  const GRPC_LIST_PAGE_SIZE = 10;
+  let grpcListPage = 1;
+
+  function updateGrpcPaginationUi(total, page, totalPages) {
+    if (!elGrpcPag || !elGrpcPagInfo || !btnGrpcListPrev || !btnGrpcListNext) return;
+    if (total <= 0) {
+      elGrpcPag.hidden = true;
+      return;
+    }
+    elGrpcPag.hidden = false;
+    const tp = Math.max(1, totalPages);
+    const p = Math.min(Math.max(1, page), tp);
+    elGrpcPagInfo.textContent =
+      "Página " +
+      p +
+      " de " +
+      tp +
+      " · " +
+      total +
+      " formulario" +
+      (total === 1 ? "" : "s");
+    btnGrpcListPrev.disabled = p <= 1;
+    btnGrpcListNext.disabled = p >= tp;
+  }
+
+  async function listarGrpcPagina(page) {
     const base = grpcProxyBase();
     const token = tokenActual();
     if (!token) {
@@ -632,24 +674,35 @@ export function initGrpcWebPage() {
       return;
     }
     clearListError();
+    if (!elList) return;
+    grpcListPage = page;
     try {
       const proto = await loadProto();
       const ListarReq = lookupTipoEncuesta(proto, "proyecto2.encuesta.ListarFormulariosRequest");
       const incluirEl = /** @type {HTMLInputElement | null} */ (document.getElementById("incluirImagen"));
       const incluir = incluirEl?.checked ?? false;
       const bytes = ListarReq.encode(
-        ListarReq.create({ incluirImagenBase64: incluir })
+        ListarReq.create({
+          incluirImagenBase64: incluir,
+          page: page,
+          pageSize: GRPC_LIST_PAGE_SIZE,
+        })
       ).finish();
       const replyBytes = await grpcWebUnary(base, "ListarFormularios", bytes, token);
       const ListarReply = lookupTipoEncuesta(proto, "proyecto2.encuesta.ListarFormulariosReply");
       const decoded = ListarReply.decode(replyBytes);
       const obj = ListarReply.toObject(decoded, { longs: Number, defaults: true });
-      if (!elList) return;
+      const total = Number(obj.total ?? 0);
+      const curPage = Number(obj.page ?? page);
+      const ps = Number(obj.pageSize ?? GRPC_LIST_PAGE_SIZE);
+      grpcListPage = curPage;
+      const totalPages = ps > 0 ? Math.ceil(total / ps) : 0;
       elList.innerHTML = "";
       const rows = /** @type {Record<string, unknown>[]} */ (obj.formularios || []);
       if (rows.length === 0) {
         elList.innerHTML =
           '<tr><td colspan="4" class="grpc-empty">No hay formularios visibles para su usuario.</td></tr>';
+        updateGrpcPaginationUi(0, 1, 0);
         return;
       }
       for (const raw of rows) {
@@ -673,9 +726,21 @@ export function initGrpcWebPage() {
         });
         elList.appendChild(tr);
       }
+      updateGrpcPaginationUi(total, curPage, totalPages);
     } catch (err) {
       showListError(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  document.getElementById("btnListar")?.addEventListener("click", async () => {
+    await listarGrpcPagina(1);
+  });
+  btnGrpcListPrev?.addEventListener("click", async () => {
+    if (grpcListPage <= 1) return;
+    await listarGrpcPagina(grpcListPage - 1);
+  });
+  btnGrpcListNext?.addEventListener("click", async () => {
+    await listarGrpcPagina(grpcListPage + 1);
   });
 
   elFormCrear?.addEventListener("submit", async (e) => {
