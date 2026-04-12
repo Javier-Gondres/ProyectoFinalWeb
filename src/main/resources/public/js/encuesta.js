@@ -424,6 +424,280 @@ function initEncuesta() {
     }
   });
 
+  const NIVEL_LABEL = {
+    BASICO: "Básico",
+    MEDIO: "Medio",
+    GRADO_UNIVERSITARIO: "Grado universitario",
+    POSTGRADO: "Postgrado",
+    DOCTORADO: "Doctorado",
+  };
+
+  function etiquetaNivelList(codigo) {
+    if (codigo == null || codigo === "") return "—";
+    const k = String(codigo).trim();
+    return NIVEL_LABEL[/** @type {keyof typeof NIVEL_LABEL} */ (k)] || k;
+  }
+
+  function escapeHtmlRest(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  /**
+   * @param {unknown} c
+   */
+  function creadoEnAMillis(c) {
+    if (c == null) return null;
+    if (typeof c === "number") return Number.isFinite(c) ? c : null;
+    if (typeof c === "string") {
+      const t = Date.parse(c);
+      return Number.isNaN(t) ? null : t;
+    }
+    if (typeof c === "object" && c !== null && "$date" in /** @type {object} */ (c)) {
+      const d = /** @type {{ $date: number | string }} */ (c).$date;
+      if (typeof d === "number") return Number.isFinite(d) ? d : null;
+      const t = Date.parse(String(d));
+      return Number.isNaN(t) ? null : t;
+    }
+    return null;
+  }
+
+  function fechaCortaMs(ms) {
+    if (ms == null || !Number.isFinite(ms)) return "—";
+    const d = new Date(ms);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("es-DO", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  function imagenDataUrlRest(imagenBase64) {
+    if (imagenBase64 == null || typeof imagenBase64 !== "string") return null;
+    const t = imagenBase64.trim();
+    if (!t) return null;
+    if (t.startsWith("data:")) {
+      return t.startsWith("data:image/") ? t : null;
+    }
+    return "data:image/jpeg;base64," + t.replace(/\s/g, "");
+  }
+
+  function formatoFechaDetalleRest(iso) {
+    if (iso == null || iso === "") return "—";
+    try {
+      const d = new Date(/** @type {string | number} */ (iso));
+      if (Number.isNaN(d.getTime())) return escapeHtmlRest(String(iso));
+      return escapeHtmlRest(
+        d.toLocaleString("es-DO", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
+      );
+    } catch {
+      return escapeHtmlRest(String(iso));
+    }
+  }
+
+  /**
+   * @param {Record<string, unknown>} form
+   */
+  function buildDetailModalHtmlRest(form) {
+    const nombre = escapeHtmlRest(String(form.nombre || "—"));
+    const sector = escapeHtmlRest(String(form.sector || "—"));
+    const nivel = escapeHtmlRest(etiquetaNivelList(form.nivelEscolar));
+    const lat = form.latitud;
+    const lon = form.longitud;
+    const coordsText =
+      typeof lat === "number" && typeof lon === "number"
+        ? escapeHtmlRest(lat.toFixed(6) + ", " + lon.toFixed(6))
+        : "—";
+    const encuestador = escapeHtmlRest(String(form.usuarioRegistroUsername || "—"));
+    const creado = formatoFechaDetalleRest(form.creadoEn);
+    const src = imagenDataUrlRest(form.imagenBase64 != null ? String(form.imagenBase64) : "");
+    const imgBlock = src
+      ? '<div class="map-popup__img-wrap"><img class="map-popup__img" src="' + src + '" alt="" loading="lazy" /></div>'
+      : '<p class="map-popup__muted">Sin imagen adjunta.</p>';
+
+    return (
+      '<article class="map-popup">' +
+      '<h3 class="map-popup__title">' +
+      nombre +
+      "</h3>" +
+      '<dl class="map-popup__dl">' +
+      "<dt>Zona / sector</dt><dd>" +
+      sector +
+      "</dd>" +
+      "<dt>Nivel escolar</dt><dd>" +
+      nivel +
+      "</dd>" +
+      "<dt>Coordenadas</dt><dd>" +
+      coordsText +
+      "</dd>" +
+      "<dt>Registrado por</dt><dd>" +
+      encuestador +
+      "</dd>" +
+      "<dt>Fecha</dt><dd>" +
+      creado +
+      "</dd>" +
+      "</dl>" +
+      imgBlock +
+      "</article>"
+    );
+  }
+
+  const elListErr = document.getElementById("encRestListError");
+  const elListBody = document.getElementById("encRestListBody");
+  const elRestPag = document.getElementById("encRestPagination");
+  const elRestPagInfo = document.getElementById("encRestPaginationInfo");
+  const btnRestPrev = document.getElementById("encRestPrev");
+  const btnRestNext = document.getElementById("encRestNext");
+  const elBackdrop = document.getElementById("encRestModalBackdrop");
+  const elModalBody = document.getElementById("encRestModalBody");
+
+  const REST_PAGE_SIZE = 10;
+  let restListPage = 1;
+
+  function updateRestPaginationUi(total, page, totalPages) {
+    if (!elRestPag || !elRestPagInfo || !btnRestPrev || !btnRestNext) return;
+    if (total <= 0) {
+      elRestPag.hidden = true;
+      return;
+    }
+    elRestPag.hidden = false;
+    const tp = Math.max(1, totalPages);
+    const p = Math.min(Math.max(1, page), tp);
+    elRestPagInfo.textContent =
+      "Página " +
+      p +
+      " de " +
+      tp +
+      " · " +
+      total +
+      " formulario" +
+      (total === 1 ? "" : "s");
+    btnRestPrev.disabled = p <= 1;
+    btnRestNext.disabled = p >= tp;
+  }
+
+  function showListErrorRest(msg) {
+    if (!elListErr) return;
+    elListErr.textContent = msg;
+    elListErr.hidden = false;
+  }
+
+  function clearListErrorRest() {
+    if (!elListErr) return;
+    elListErr.textContent = "";
+    elListErr.hidden = true;
+  }
+
+  function closeDetalleModalRest() {
+    if (elBackdrop) elBackdrop.hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  function openDetalleModalRest() {
+    if (elBackdrop) elBackdrop.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+
+  /**
+   * @param {string} id
+   */
+  async function showDetalleFormularioRest(id) {
+    if (!id || !elModalBody) return;
+    openDetalleModalRest();
+    elModalBody.innerHTML =
+      '<article class="map-popup"><p class="map-popup__loading">Cargando detalle…</p></article>';
+    try {
+      const data = await apiJson("/api/formularios/" + encodeURIComponent(id));
+      elModalBody.innerHTML = buildDetailModalHtmlRest(
+        /** @type {Record<string, unknown>} */ (data.formulario || {})
+      );
+    } catch (e) {
+      const msgErr = e instanceof Error ? e.message : String(e);
+      elModalBody.innerHTML =
+        '<article class="map-popup map-popup--err"><p>' + escapeHtmlRest(msgErr) + "</p></article>";
+    }
+  }
+
+  async function cargarListaRest(page) {
+    const token = tokenActual();
+    if (!token) {
+      window.location.href = "/login.html";
+      return;
+    }
+    clearListErrorRest();
+    if (!elListBody) return;
+    restListPage = page;
+    try {
+      const qs = new URLSearchParams({
+        page: String(page),
+        pageSize: String(REST_PAGE_SIZE),
+      });
+      const data = await apiJson("/api/formularios?" + qs.toString());
+      const total = Number(data.total ?? 0);
+      const totalPages = Number(data.totalPages ?? 0);
+      const curPage = Number(data.page ?? page);
+      restListPage = curPage;
+      const rows = /** @type {Record<string, unknown>[]} */ (data.formularios || []);
+      elListBody.innerHTML = "";
+      if (rows.length === 0) {
+        elListBody.innerHTML =
+          '<tr><td colspan="4" class="grpc-empty">No hay formularios visibles para su usuario.</td></tr>';
+        updateRestPaginationUi(0, 1, 0);
+        return;
+      }
+      for (const raw of rows) {
+        const id = String(raw.id ?? "");
+        const nombre = String(raw.nombre ?? "");
+        const sector = String(raw.sector ?? "");
+        const nivelRaw = String(raw.nivelEscolar ?? "").trim();
+        const millis = creadoEnAMillis(raw.creadoEn);
+        const tr = document.createElement("tr");
+        tr.className = "grpc-row";
+        tr.tabIndex = 0;
+        tr.setAttribute("role", "button");
+        tr.dataset.id = id;
+        tr.innerHTML = `
+          <td>${escapeHtmlRest(nombre)}</td>
+          <td>${escapeHtmlRest(sector)}</td>
+          <td>${escapeHtmlRest(etiquetaNivelList(nivelRaw))}</td>
+          <td>${escapeHtmlRest(fechaCortaMs(millis))}</td>`;
+        tr.addEventListener("click", () => showDetalleFormularioRest(id));
+        tr.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            showDetalleFormularioRest(id);
+          }
+        });
+        elListBody.appendChild(tr);
+      }
+      updateRestPaginationUi(total, curPage, totalPages);
+    } catch (err) {
+      showListErrorRest(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  document.getElementById("btnListarRest")?.addEventListener("click", async () => {
+    await cargarListaRest(1);
+  });
+  btnRestPrev?.addEventListener("click", async () => {
+    if (restListPage <= 1) return;
+    await cargarListaRest(restListPage - 1);
+  });
+  btnRestNext?.addEventListener("click", async () => {
+    await cargarListaRest(restListPage + 1);
+  });
+
+  document.getElementById("encRestModalClose")?.addEventListener("click", closeDetalleModalRest);
+  elBackdrop?.addEventListener("click", (e) => {
+    if (e.target === elBackdrop) closeDetalleModalRest();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && elBackdrop && !elBackdrop.hidden) closeDetalleModalRest();
+  });
+
   setCapturaVisible(false);
   setBannerEdicion();
   renderPendientes();
