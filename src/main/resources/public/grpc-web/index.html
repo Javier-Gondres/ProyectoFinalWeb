@@ -196,7 +196,7 @@
   </header>
   <main class="main-wide grpc-page">
     <h1 class="page-title">Cliente gRPC</h1>
-    <p class="page-lead">Gestion del formulario con gRPC.</p>
+    <p class="page-lead">Formulario vía gRPC</p>
 
     <div id="bannerEdicionGrpc" class="banner-edicion" hidden>
       <span id="bannerEdicionTextoGrpc"></span>
@@ -290,7 +290,6 @@
 
           <div class="form-actions">
             <button type="submit" id="grpcBtnEnviar">Enviar al servidor</button>
-            <button type="button" class="secondary" id="grpcBtnLocal">Guardar en cola local</button>
           </div>
         </form>
         <div id="grpcMsg"></div>
@@ -299,7 +298,7 @@
       <section class="card" aria-labelledby="grpc-h-queue">
         <p class="card-title" id="grpc-h-queue">Cola local</p>
         <p class="page-lead" style="margin-bottom: 1rem; font-size: 0.9rem">
-          Borradores en este dispositivo. Puede editarlos antes de sincronizar. Sincronizar cuando haya conexión.
+          Borradores sin red o sin gRPC. Sincronizar sube los datos al servidor por REST.
         </p>
         <ul id="grpcPendientes" class="queue-list"></ul>
         <div class="btn-row btn-row--start">

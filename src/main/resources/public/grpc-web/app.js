@@ -1,27 +1,24 @@
-/**
- * Cliente gRPC-Web (navegador): unary sobre application/grpc-web+proto vía Envoy.
- *
- * Usamos imports estáticos desde esm.sh: el empaquetado +esm de jsDelivr a veces
- * deja `protobuf`/`Long` mal envueltos y entonces int64 falla con
- * "Cannot read properties of undefined (reading 'prototype')".
- */
 import { tokenActual } from "/js/auth.js";
-import { apiJson, wsSyncUrl } from "/js/api.js";
+import { apiJson } from "/js/api.js";
 import {
   guardarPendiente,
   listarPendientes,
   borrarPendiente,
   actualizarPendiente,
 } from "/js/colas-local.js";
+import { esFalloDeRed } from "/js/red-utils.js";
+import { sincronizarColaRest } from "/js/sincronizar-cola.js";
 import { initGrpcFormularioEncuestaLike } from "/grpc-web/grpc-form-ui.js";
 
 import * as protobufMod from "https://esm.sh/protobufjs@7.4.0";
 import * as longMod from "https://esm.sh/long@5.2.3";
 
 const SERVICE = "proyecto2.encuesta.EncuestaService";
-/** Opcional: clave localStorage `grpc_web_base_url` si el proxy no está en 7080. */
 const STORAGE_BASE = "grpc_web_base_url";
 const DEFAULT_GRPC_WEB_PROXY = "http://127.0.0.1:7080";
+// Texto del .proto en caché para poder codificar sin red tras navegar
+const PROTO_TEXT_SESSION = "encuesta_grpc_proto_text";
+const PROTO_TEXT_LOCAL = "encuesta_grpc_proto_text";
 
 const protobuf = unwrapDefault(protobufMod);
 const LongCtor = unwrapLongCtor(longMod);
@@ -66,9 +63,31 @@ function unwrapLongCtor(ns) {
   return null;
 }
 
+function guardarProtoEnCache(text) {
+  if (!text || !text.includes("CrearFormularioRequest")) return;
+  try {
+    sessionStorage.setItem(PROTO_TEXT_SESSION, text);
+  } catch (_) {}
+  try {
+    localStorage.setItem(PROTO_TEXT_LOCAL, text);
+  } catch (_) {}
+}
+
+function leerProtoDesdeCache() {
+  try {
+    const s = sessionStorage.getItem(PROTO_TEXT_SESSION);
+    if (s) return s;
+  } catch (_) {}
+  try {
+    return localStorage.getItem(PROTO_TEXT_LOCAL);
+  } catch (_) {
+    return null;
+  }
+}
+
 async function loadProto() {
   if (protoRoot) return protoRoot;
-  if (!protobuf || typeof protobuf.load !== "function") {
+  if (!protobuf || typeof protobuf.parse !== "function") {
     throw new Error("protobufjs no cargó correctamente (import esm.sh).");
   }
   if (!protobuf.util || typeof protobuf.util.Long !== "function") {
@@ -76,8 +95,74 @@ async function loadProto() {
       "La clase Long no está enlazada; int64 (creado_en_millis) no funcionará. Recargue la página."
     );
   }
-  protoRoot = await protobuf.load("/grpc-web/encuesta.proto");
+
+  let text = null;
+  try {
+    const res = await fetch("/grpc-web/encuesta.proto", { cache: "default" });
+    if (res.ok) {
+      const t = await res.text();
+      if (t.includes("syntax") && t.includes("CrearFormularioRequest")) {
+        text = t;
+        guardarProtoEnCache(t);
+      }
+    }
+  } catch (_) {
+    /* sin red u otro fallo de fetch */
+  }
+
+  if (!text) {
+    text = leerProtoDesdeCache();
+  }
+
+  if (!text || !text.includes("CrearFormularioRequest")) {
+    throw new Error(
+      "No hay esquema protobuf en caché. Abra esta página al menos una vez con conexión para poder enviar o guardar en cola sin red."
+    );
+  }
+
+  try {
+    protoRoot = protobuf.parse(text);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error("No se pudo leer encuesta.proto: " + msg);
+  }
   return protoRoot;
+}
+
+/**
+ * @param {import('protobufjs').Root} root
+ * @param {string} fullName
+ */
+function lookupTipoEncuesta(root, fullName) {
+  const shortName = fullName.includes(".") ? fullName.split(".").pop() : fullName;
+  const candidates = [fullName, "." + fullName, shortName || fullName];
+  for (const name of candidates) {
+    if (!name) continue;
+    try {
+      const t = root.lookupType(name);
+      if (t) return t;
+    } catch (_) {
+      // siguiente variante
+    }
+  }
+  const viaLookup = root.lookup(fullName) || root.lookup("." + fullName) || (shortName ? root.lookup(shortName) : null);
+  if (viaLookup && typeof /** @type {{ encode?: unknown }} */ (viaLookup).encode === "function") {
+    return /** @type {import('protobufjs').Type} */ (viaLookup);
+  }
+  throw new Error("no such type: " + fullName);
+}
+
+/**
+ * Errores de red, proxy, esquema no disponible sin caché o tipo protobuf roto → mismo tratamiento que offline (cola local).
+ * @param {unknown} err
+ */
+function debeGuardarFormularioEnColaGrpc(err) {
+  if (esFalloDeRed(err)) return true;
+  const m = String(err instanceof Error ? err.message : err);
+  if (/no such type:/i.test(m)) return true;
+  if (/No hay esquema protobuf en caché/i.test(m)) return true;
+  if (/No se pudo leer encuesta\.proto/i.test(m)) return true;
+  return false;
 }
 
 function frameGrpcMessage(payload) {
@@ -327,14 +412,12 @@ export function initGrpcWebPage() {
 
   const grpcFormUi = initGrpcFormularioEncuestaLike(flashGrpc);
 
-  /** Si no es null, el formulario actualiza este borrador al guardar en cola local. */
   /** @type {number | null} */
   let editingLocalId = null;
 
   const elBannerGrpc = $("bannerEdicionGrpc");
   const elBannerTextoGrpc = $("bannerEdicionTextoGrpc");
   const btnCancelarEdicionGrpc = $("btnCancelarEdicionGrpc");
-  const grpcBtnLocal = /** @type {HTMLButtonElement | null} */ ($("grpcBtnLocal"));
   const grpcPendientesUl = $("grpcPendientes");
 
   /**
@@ -376,12 +459,6 @@ export function initGrpcWebPage() {
     elBannerTextoGrpc.textContent = "Editando borrador #" + editingLocalId;
   }
 
-  function setTextoBtnGrpcLocal() {
-    if (!grpcBtnLocal) return;
-    grpcBtnLocal.textContent =
-      editingLocalId != null ? "Actualizar borrador en cola" : "Guardar en cola local";
-  }
-
   function cancelarEdicionGrpc() {
     editingLocalId = null;
     elFormCrear?.reset();
@@ -391,7 +468,6 @@ export function initGrpcWebPage() {
     if (lonEl) lonEl.value = "";
     grpcFormUi.limpiarFoto();
     setBannerEdicionGrpc();
-    setTextoBtnGrpcLocal();
     void renderPendientesGrpc();
     flashGrpc("Edición cancelada.", true);
   }
@@ -417,7 +493,6 @@ export function initGrpcWebPage() {
     grpcFormUi.cargarBorradorFoto(it.imagenBase64 || "");
     editingLocalId = it.localId;
     setBannerEdicionGrpc();
-    setTextoBtnGrpcLocal();
     void renderPendientesGrpc();
     flashGrpc("Borrador cargado.", true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -457,7 +532,6 @@ export function initGrpcWebPage() {
           if (lonEl) lonEl.value = "";
           grpcFormUi.limpiarFoto();
           setBannerEdicionGrpc();
-          setTextoBtnGrpcLocal();
         }
         await borrarPendiente(it.localId);
         await renderPendientesGrpc();
@@ -471,76 +545,44 @@ export function initGrpcWebPage() {
     }
   }
 
-  grpcBtnLocal?.addEventListener("click", async () => {
-    const p = leerFormularioGrpc();
-    const err = validarGrpc(p);
-    if (err) return flashGrpc(err, false);
+  $("grpcBtnSyncWs")?.addEventListener("click", async () => {
+    if (!tokenActual()) return flashGrpc("Sin token. Inicie sesión.", false);
+    const btn = /** @type {HTMLButtonElement | null} */ ($("grpcBtnSyncWs"));
+    const texto = btn ? btn.textContent : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Sincronizando...";
+    }
     try {
-      if (editingLocalId != null) {
-        await actualizarPendiente(editingLocalId, p);
-        flashGrpc("Borrador actualizado en la cola local.", true);
+      const r = await sincronizarColaRest();
+      if (r.sinPendientes) {
+        flashGrpc("No hay pendientes.", false);
+      } else if (r.errores.length) {
+        flashGrpc(
+          "Algunos borradores no se pudieron subir: " + r.errores.map((e) => e.mensaje).join("; "),
+          false
+        );
       } else {
-        await guardarPendiente(p);
-        flashGrpc("Guardado en cola local.", true);
+        flashGrpc("Cola sincronizada (" + r.enviados + " enviados).", true);
       }
-      editingLocalId = null;
-      setBannerEdicionGrpc();
-      setTextoBtnGrpcLocal();
-      elFormCrear?.reset();
-      grpcFormUi.limpiarFoto();
-      const latEl = /** @type {HTMLInputElement | null} */ ($("grpcLat"));
-      const lonEl = /** @type {HTMLInputElement | null} */ ($("grpcLon"));
-      if (latEl) latEl.value = "";
-      if (lonEl) lonEl.value = "";
       await renderPendientesGrpc();
-    } catch (ex) {
-      flashGrpc(ex instanceof Error ? ex.message : String(ex), false);
+      if (editingLocalId != null) {
+        const siguen = await listarPendientes();
+        if (!siguen.some((x) => x.localId === editingLocalId)) {
+          editingLocalId = null;
+          setBannerEdicionGrpc();
+        }
+      }
+    } catch (e) {
+      flashGrpc(e instanceof Error ? e.message : String(e), false);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = texto || "Sincronizar cola";
+      }
     }
   });
 
-  $("grpcBtnSyncWs")?.addEventListener("click", () => {
-    const token = tokenActual();
-    if (!token) return flashGrpc("Sin token. Inicie sesión.", false);
-    listarPendientes().then((items) => {
-      if (!items.length) return flashGrpc("No hay pendientes.", false);
-      const payload = items.map(({ localId, creadoLocal, ...rest }) => rest);
-      const worker = new Worker("/js/sync-worker.js", { type: "module" });
-      worker.onmessage = async (ev) => {
-        worker.terminate();
-        const d = ev.data;
-        if (!d.ok) return flashGrpc("Fallo WebSocket: " + (d.error || "red"), false);
-        let r;
-        try {
-          r = JSON.parse(d.raw);
-        } catch {
-          return flashGrpc("Respuesta WS inesperada: " + d.raw, false);
-        }
-        if (r.error) return flashGrpc(String(r.error), false);
-        const fallidos = new Set((r.errores || []).map((e) => e.indice));
-        for (let i = 0; i < items.length; i++) {
-          if (!fallidos.has(i)) await borrarPendiente(items[i].localId);
-        }
-        if (r.errores?.length) flashGrpc("Algunos ítems fallaron: " + JSON.stringify(r.errores), false);
-        else flashGrpc("Cola sincronizada por WebSocket.", true);
-        await renderPendientesGrpc();
-        if (editingLocalId != null) {
-          const siguen = await listarPendientes();
-          if (!siguen.some((x) => x.localId === editingLocalId)) {
-            editingLocalId = null;
-            setBannerEdicionGrpc();
-            setTextoBtnGrpcLocal();
-          }
-        }
-      };
-      worker.postMessage({
-        wsUrl: wsSyncUrl(),
-        token,
-        items: payload,
-      });
-    });
-  });
-
-  setTextoBtnGrpcLocal();
   setBannerEdicionGrpc();
   void renderPendientesGrpc();
 
@@ -592,14 +634,14 @@ export function initGrpcWebPage() {
     clearListError();
     try {
       const proto = await loadProto();
-      const ListarReq = proto.lookupType("proyecto2.encuesta.ListarFormulariosRequest");
+      const ListarReq = lookupTipoEncuesta(proto, "proyecto2.encuesta.ListarFormulariosRequest");
       const incluirEl = /** @type {HTMLInputElement | null} */ (document.getElementById("incluirImagen"));
       const incluir = incluirEl?.checked ?? false;
       const bytes = ListarReq.encode(
         ListarReq.create({ incluirImagenBase64: incluir })
       ).finish();
       const replyBytes = await grpcWebUnary(base, "ListarFormularios", bytes, token);
-      const ListarReply = proto.lookupType("proyecto2.encuesta.ListarFormulariosReply");
+      const ListarReply = lookupTipoEncuesta(proto, "proyecto2.encuesta.ListarFormulariosReply");
       const decoded = ListarReply.decode(replyBytes);
       const obj = ListarReply.toObject(decoded, { longs: Number, defaults: true });
       if (!elList) return;
@@ -658,11 +700,10 @@ export function initGrpcWebPage() {
       btnEnviar.disabled = true;
       btnEnviar.textContent = "Cargando...";
     }
-    if (grpcBtnLocal) grpcBtnLocal.disabled = true;
     elFormCrear.setAttribute("aria-busy", "true");
     try {
       const proto = await loadProto();
-      const CrearReq = proto.lookupType("proyecto2.encuesta.CrearFormularioRequest");
+      const CrearReq = lookupTipoEncuesta(proto, "proyecto2.encuesta.CrearFormularioRequest");
       // protobufjs usa nombres camelCase en JS (p. ej. nivelEscolar), no nivel_escolar del .proto.
       const body = CrearReq.encode(
         CrearReq.create({
@@ -675,7 +716,7 @@ export function initGrpcWebPage() {
         })
       ).finish();
       const replyBytes = await grpcWebUnary(base, "CrearFormulario", body, token);
-      const CrearReply = proto.lookupType("proyecto2.encuesta.CrearFormularioReply");
+      const CrearReply = lookupTipoEncuesta(proto, "proyecto2.encuesta.CrearFormularioReply");
       const decoded = CrearReply.decode(replyBytes);
       CrearReply.toObject(decoded, { longs: Number, defaults: true });
       if (editingLocalId != null) {
@@ -683,7 +724,6 @@ export function initGrpcWebPage() {
       }
       editingLocalId = null;
       setBannerEdicionGrpc();
-      setTextoBtnGrpcLocal();
       await renderPendientesGrpc();
       flashGrpc("Enviado al servidor correctamente (gRPC).", true);
       elFormCrear.reset();
@@ -693,13 +733,37 @@ export function initGrpcWebPage() {
       if (latEl) latEl.value = "";
       if (lonEl) lonEl.value = "";
     } catch (err) {
-      flashGrpc(err instanceof Error ? err.message : String(err), false);
+      if (debeGuardarFormularioEnColaGrpc(err)) {
+        try {
+          if (editingLocalId != null) {
+            await actualizarPendiente(editingLocalId, p);
+          } else {
+            await guardarPendiente(p);
+          }
+          editingLocalId = null;
+          setBannerEdicionGrpc();
+          flashGrpc(
+            "Se guardó en la cola local porque no hay conexión con el servidor. Podrá sincronizarla con el botón de la cola.",
+            true
+          );
+          elFormCrear.reset();
+          grpcFormUi.limpiarFoto();
+          const latEl = /** @type {HTMLInputElement | null} */ ($("grpcLat"));
+          const lonEl = /** @type {HTMLInputElement | null} */ ($("grpcLon"));
+          if (latEl) latEl.value = "";
+          if (lonEl) lonEl.value = "";
+          await renderPendientesGrpc();
+        } catch (idbErr) {
+          flashGrpc(idbErr instanceof Error ? idbErr.message : String(idbErr), false);
+        }
+      } else {
+        flashGrpc(err instanceof Error ? err.message : String(err), false);
+      }
     } finally {
       if (btnEnviar) {
         btnEnviar.disabled = false;
         btnEnviar.textContent = textoEnviar;
       }
-      if (grpcBtnLocal) grpcBtnLocal.disabled = false;
       elFormCrear.removeAttribute("aria-busy");
     }
   });
