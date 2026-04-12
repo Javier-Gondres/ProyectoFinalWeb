@@ -1,7 +1,9 @@
 import { tokenActual } from "./auth.js";
-import { apiJson, wsSyncUrl } from "./api.js";
+import { apiJson } from "./api.js";
 import { initSessionHeader } from "./nav-session.js";
 import { guardarPendiente, listarPendientes, borrarPendiente, actualizarPendiente } from "./colas-local.js";
+import { esFalloDeRed } from "./red-utils.js";
+import { sincronizarColaRest } from "./sincronizar-cola.js";
 
 if (!tokenActual()) {
   window.location.href = "/login.html";
@@ -125,12 +127,6 @@ function initEncuesta() {
       editingLocalId;
   }
 
-  function setTextoBtnLocal() {
-    const btn = document.getElementById("btnLocal");
-    if (!btn) return;
-    btn.textContent = editingLocalId != null ? "Actualizar borrador en cola" : "Guardar en cola local";
-  }
-
   function cancelarEdicionBorrador() {
     editingLocalId = null;
     document.getElementById("formEncuesta").reset();
@@ -138,7 +134,6 @@ function initEncuesta() {
     document.getElementById("lon").value = "";
     limpiarFoto();
     setBannerEdicion();
-    setTextoBtnLocal();
     renderPendientes();
     flash("Edición cancelada.", true);
   }
@@ -160,7 +155,6 @@ function initEncuesta() {
     actualizarUIFoto();
     editingLocalId = it.localId;
     setBannerEdicion();
-    setTextoBtnLocal();
     renderPendientes();
     flash("Borrador cargado", true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -298,13 +292,11 @@ function initEncuesta() {
     if (err) return flash(err, false);
     const form = e.target;
     const btnEnviar = form.querySelector('button[type="submit"]');
-    const btnLocal = document.getElementById("btnLocal");
     const textoEnviar = btnEnviar ? btnEnviar.textContent : "";
     if (btnEnviar) {
       btnEnviar.disabled = true;
       btnEnviar.textContent = "Cargando...";
     }
-    if (btnLocal) btnLocal.disabled = true;
     form.setAttribute("aria-busy", "true");
     try {
       await apiJson("/api/formularios", { method: "POST", body: p });
@@ -313,43 +305,39 @@ function initEncuesta() {
       }
       editingLocalId = null;
       setBannerEdicion();
-      setTextoBtnLocal();
       flash("Enviado al servidor correctamente.", true);
       form.reset();
       limpiarFoto();
       renderPendientes();
     } catch (ex) {
-      flash(ex.message || "Error al enviar", false);
+      if (esFalloDeRed(ex)) {
+        try {
+          if (editingLocalId != null) {
+            await actualizarPendiente(editingLocalId, p);
+          } else {
+            await guardarPendiente(p);
+          }
+          editingLocalId = null;
+          setBannerEdicion();
+          flash(
+            "Se guardó en la cola local porque no hay conexión con el servidor. Podrá sincronizarla cuando vuelva la red.",
+            true
+          );
+          form.reset();
+          limpiarFoto();
+          await renderPendientes();
+        } catch (idbErr) {
+          flash(idbErr instanceof Error ? idbErr.message : String(idbErr), false);
+        }
+      } else {
+        flash(ex instanceof Error ? ex.message : String(ex), false);
+      }
     } finally {
       if (btnEnviar) {
         btnEnviar.disabled = false;
         btnEnviar.textContent = textoEnviar;
       }
-      if (btnLocal) btnLocal.disabled = false;
       form.removeAttribute("aria-busy");
-    }
-  });
-
-  document.getElementById("btnLocal").addEventListener("click", async () => {
-    const p = leerFormulario();
-    const err = validar(p);
-    if (err) return flash(err, false);
-    try {
-      if (editingLocalId != null) {
-        await actualizarPendiente(editingLocalId, p);
-        flash("Borrador actualizado en la cola local.", true);
-      } else {
-        await guardarPendiente(p);
-        flash("Guardado en cola local.", true);
-      }
-      editingLocalId = null;
-      setBannerEdicion();
-      setTextoBtnLocal();
-      document.getElementById("formEncuesta").reset();
-      limpiarFoto();
-      renderPendientes();
-    } catch (ex) {
-      flash(ex.message || "No se pudo guardar en cola.", false);
     }
   });
 
@@ -385,7 +373,6 @@ function initEncuesta() {
           document.getElementById("lon").value = "";
           limpiarFoto();
           setBannerEdicion();
-          setTextoBtnLocal();
         }
         await borrarPendiente(it.localId);
         renderPendientes();
@@ -399,50 +386,45 @@ function initEncuesta() {
     }
   }
 
-  document.getElementById("btnSyncWs").addEventListener("click", () => {
-    const token = tokenActual();
-    if (!token) return flash("Sin token. Inicie sesión.", false);
-    listarPendientes().then((items) => {
-      if (!items.length) return flash("No hay pendientes.", false);
-      const payload = items.map(({ localId, creadoLocal, ...rest }) => rest);
-      const worker = new Worker("/js/sync-worker.js", { type: "module" });
-      worker.onmessage = async (ev) => {
-        worker.terminate();
-        const d = ev.data;
-        if (!d.ok) return flash("Fallo WebSocket: " + (d.error || "red"), false);
-        let r;
-        try {
-          r = JSON.parse(d.raw);
-        } catch {
-          return flash("Respuesta WS inesperada: " + d.raw, false);
+  document.getElementById("btnSyncWs").addEventListener("click", async () => {
+    if (!tokenActual()) return flash("Sin token. Inicie sesión.", false);
+    const btn = document.getElementById("btnSyncWs");
+    const texto = btn ? btn.textContent : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Sincronizando...";
+    }
+    try {
+      const r = await sincronizarColaRest();
+      if (r.sinPendientes) {
+        flash("No hay pendientes.", false);
+      } else if (r.errores.length) {
+        flash(
+          "Algunos borradores no se pudieron subir: " + r.errores.map((e) => e.mensaje).join("; "),
+          false
+        );
+      } else {
+        flash("Cola sincronizada (" + r.enviados + " enviados).", true);
+      }
+      await renderPendientes();
+      if (editingLocalId != null) {
+        const siguen = await listarPendientes();
+        if (!siguen.some((x) => x.localId === editingLocalId)) {
+          editingLocalId = null;
+          setBannerEdicion();
         }
-        if (r.error) return flash(String(r.error), false);
-        const fallidos = new Set((r.errores || []).map((e) => e.indice));
-        for (let i = 0; i < items.length; i++) {
-          if (!fallidos.has(i)) await borrarPendiente(items[i].localId);
-        }
-        if (r.errores?.length) flash("Algunos ítems fallaron: " + JSON.stringify(r.errores), false);
-        else flash("Cola sincronizada por WebSocket.", true);
-        await renderPendientes();
-        if (editingLocalId != null) {
-          const siguen = await listarPendientes();
-          if (!siguen.some((x) => x.localId === editingLocalId)) {
-            editingLocalId = null;
-            setBannerEdicion();
-            setTextoBtnLocal();
-          }
-        }
-      };
-      worker.postMessage({
-        wsUrl: wsSyncUrl(),
-        token,
-        items: payload,
-      });
-    });
+      }
+    } catch (e) {
+      flash(e instanceof Error ? e.message : String(e), false);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = texto || "Sincronizar cola";
+      }
+    }
   });
 
   setCapturaVisible(false);
-  setTextoBtnLocal();
   setBannerEdicion();
   renderPendientes();
   actualizarUIFoto();

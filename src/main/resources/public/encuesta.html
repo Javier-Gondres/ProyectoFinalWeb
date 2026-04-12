@@ -33,7 +33,7 @@
   </header>
   <main class="main-wide">
     <h1 class="page-title">Nueva encuesta</h1>
-    <p class="page-lead">Datos del encuestado, ubicación y foto. Envío inmediato o guardado en cola local.</p>
+    <p class="page-lead">Datos del encuestado, ubicación y foto. Si no hay conexión, el envío se guarda en cola automáticamente.</p>
     <div id="bannerEdicion" class="banner-edicion" hidden>
       <span id="bannerEdicionTexto"></span>
       <button type="button" class="secondary" id="btnCancelarEdicion" hidden>Cancelar edición</button>
@@ -100,7 +100,6 @@
 
         <div class="form-actions">
           <button type="submit">Enviar al servidor</button>
-          <button type="button" class="secondary" id="btnLocal">Guardar en cola local</button>
         </div>
       </form>
       <div id="msg"></div>
@@ -108,12 +107,12 @@
 
     <div class="card">
       <p class="card-title">Cola local</p>
-      <p class="page-lead" style="margin-bottom:1rem;font-size:0.9rem">Borradores en este dispositivo. Puede editarlos antes de sincronizar. Sincronizar cuando haya conexión.</p>
+      <p class="page-lead" style="margin-bottom:1rem;font-size:0.9rem">Borradores guardados sin red. Use sincronizar para subirlos al servidor.</p>
       <ul id="pendientes" class="queue-list"></ul>
       <button type="button" id="btnSyncWs">Sincronizar cola</button>
     </div>
   </main>
-  <footer class="site-footer">Encuesta OP · Borradores offline</footer>
+  <footer class="site-footer">Encuesta OP</footer>
   <script src="/js/vendor/webcam-easy.min.js"></script>
   <script type="module" src="/js/encuesta.js"></script>
 </body>
