@@ -21,10 +21,15 @@ message Formulario {
 
 message ListarFormulariosRequest {
   bool incluir_imagen_base64 = 1;
+  int32 page = 2;
+  int32 page_size = 3;
 }
 
 message ListarFormulariosReply {
   repeated Formulario formularios = 1;
+  int64 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
 }
 
 message CrearFormularioRequest {
