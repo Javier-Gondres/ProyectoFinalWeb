@@ -26,8 +26,20 @@ if (!tokenActual()) {
     const layer = L.layerGroup().addTo(map);
 
     try {
-      const data = await apiJson("/api/formularios");
-      const list = data.formularios || [];
+      const pageSize = 100;
+      let page = 1;
+      /** @type {Record<string, unknown>[]} */
+      const list = [];
+      let totalPages = 1;
+      for (;;) {
+        const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+        const data = await apiJson("/api/formularios?" + qs.toString());
+        const chunk = /** @type {Record<string, unknown>[]} */ (data.formularios || []);
+        list.push(...chunk);
+        totalPages = Math.max(0, Number(data.totalPages ?? 0));
+        if (page >= totalPages || chunk.length === 0) break;
+        page += 1;
+      }
       const bounds = [];
       for (const f of list) {
         const lat = f.latitud;
