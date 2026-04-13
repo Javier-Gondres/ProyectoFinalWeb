@@ -1,27 +1,35 @@
-/**
- * Web Worker: abre WebSocket con token en query y envía { items: [...] }.
- */
 self.onmessage = (e) => {
   const { wsUrl, token, items } = e.data;
   const url = wsUrl + "?token=" + encodeURIComponent(token);
   const ws = new WebSocket(url);
+  let finished = false;
+
   const to = setTimeout(() => {
+    finish({ ok: false, error: "timeout" });
+  }, 120000);
+
+  function finish(payload) {
+    if (finished) return;
+    finished = true;
+    clearTimeout(to);
+    self.postMessage(payload);
     try {
       ws.close();
     } catch (_) {}
-    self.postMessage({ ok: false, error: "timeout" });
-  }, 60000);
+  }
 
   ws.onopen = () => {
-    ws.send(JSON.stringify({ items }));
+    try {
+      ws.send(JSON.stringify({ items }));
+    } catch {
+      finish({ ok: false, error: "send" });
+    }
   };
   ws.onmessage = (ev) => {
-    clearTimeout(to);
-    self.postMessage({ ok: true, raw: ev.data });
-    ws.close();
+    const raw = typeof ev.data === "string" ? ev.data : String(ev.data);
+    finish({ ok: true, raw });
   };
   ws.onerror = () => {
-    clearTimeout(to);
-    self.postMessage({ ok: false, error: "websocket" });
+    finish({ ok: false, error: "websocket" });
   };
 };

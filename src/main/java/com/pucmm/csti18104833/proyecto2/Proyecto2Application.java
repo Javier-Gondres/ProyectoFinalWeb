@@ -51,6 +51,9 @@ public class Proyecto2Application {
 
         Javalin app = Javalin.create(javalinConfig -> {
             javalinConfig.http.maxRequestSize = 16L * 1024 * 1024; //16 mb
+            // Por defecto Jetty limita mensajes WS (~64 KiB); la cola envía JSON con base64.
+            javalinConfig.jetty.modifyWebSocketServletFactory(factory ->
+                    factory.setMaxTextMessageSize(16 * 1024 * 1024));
             javalinConfig.bundledPlugins.enableCors(cors -> cors.addRule(rule -> rule.anyHost()));
             javalinConfig.staticFiles.add(staticFiles -> {
                 staticFiles.hostedPath = "/";

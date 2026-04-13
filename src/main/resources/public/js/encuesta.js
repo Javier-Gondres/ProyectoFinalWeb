@@ -3,7 +3,7 @@ import { apiJson } from "./api.js";
 import { initSessionHeader } from "./nav-session.js";
 import { guardarPendiente, listarPendientes, borrarPendiente, actualizarPendiente } from "./colas-local.js";
 import { esFalloDeRed } from "./red-utils.js";
-import { sincronizarColaRest } from "./sincronizar-cola.js";
+import { sincronizarColaWebSocket } from "./sincronizar-cola.js";
 
 if (!tokenActual()) {
   window.location.href = "/login.html";
@@ -395,7 +395,7 @@ function initEncuesta() {
       btn.textContent = "Sincronizando...";
     }
     try {
-      const r = await sincronizarColaRest();
+      const r = await sincronizarColaWebSocket();
       if (r.sinPendientes) {
         flash("No hay pendientes.", false);
       } else if (r.errores.length) {

@@ -7,7 +7,7 @@ import {
   actualizarPendiente,
 } from "/js/colas-local.js";
 import { esFalloDeRed } from "/js/red-utils.js";
-import { sincronizarColaRest } from "/js/sincronizar-cola.js";
+import { sincronizarColaWebSocket } from "/js/sincronizar-cola.js";
 import { initGrpcFormularioEncuestaLike } from "/grpc-web/grpc-form-ui.js";
 
 import * as protobufMod from "https://esm.sh/protobufjs@7.4.0";
@@ -571,7 +571,7 @@ export function initGrpcWebPage() {
       btn.textContent = "Sincronizando...";
     }
     try {
-      const r = await sincronizarColaRest();
+      const r = await sincronizarColaWebSocket();
       if (r.sinPendientes) {
         flashGrpc("No hay pendientes.", false);
       } else if (r.errores.length) {
