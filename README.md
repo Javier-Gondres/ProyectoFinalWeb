@@ -1,8 +1,10 @@
 # Proyecto 2
 
-La app inicia en:
-- HTTP/REST/Frontend: `http://localhost:7000`
-- gRPC backend: `localhost:7070`
+URL de la pagina: https://app.jgdeveloper.me/index.html
+
+Video: https://youtu.be/d7qsNf8TC84
+
+Link del repo: https://github.com/Javier-Gondres/ProyectoFinalWeb
 
 ## Configuracion del entorno
 
