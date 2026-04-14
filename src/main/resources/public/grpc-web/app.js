@@ -15,8 +15,18 @@ import * as longMod from "https://esm.sh/long@5.2.3";
 
 const SERVICE = "proyecto2.encuesta.EncuestaService";
 const STORAGE_BASE = "grpc_web_base_url";
-const DEFAULT_GRPC_WEB_PROXY = "http://127.0.0.1:7080";
-// Texto del .proto en caché para poder codificar sin red tras navegar
+
+function defaultGrpcWebProxyBase() {
+  try {
+    const h = window.location.hostname;
+    if (h === "localhost" || h === "127.0.0.1" || h === "[::1]") {
+      return "http://127.0.0.1:7080";
+    }
+    return window.location.origin;
+  } catch (_) {
+    return "http://127.0.0.1:7080";
+  }
+}
 const PROTO_TEXT_SESSION = "encuesta_grpc_proto_text";
 const PROTO_TEXT_LOCAL = "encuesta_grpc_proto_text";
 
@@ -265,7 +275,7 @@ function grpcProxyBase() {
     const s = localStorage.getItem(STORAGE_BASE);
     if (s && s.trim()) return s.replace(/\/+$/, "");
   } catch (_) {}
-  return DEFAULT_GRPC_WEB_PROXY;
+  return defaultGrpcWebProxyBase();
 }
 
 const NIVEL_LABEL = {

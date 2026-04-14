@@ -1,0 +1,23 @@
+services:
+  proyecto2-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: proyecto2-app
+    env_file:
+      - .env
+    ports:
+      - "7000:7000"
+    restart: unless-stopped
+
+  grpcweb-envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    container_name: proyecto2-grpcweb-envoy
+    depends_on:
+      - proyecto2-app
+    ports:
+      - "7080:7080"
+      - "9901:9901"
+    volumes:
+      - ./scripts/grpc-web/envoy.compose.yaml:/etc/envoy/envoy.yaml:ro
+    restart: unless-stopped
